@@ -128,6 +128,9 @@ int CoolingTestInitialize(FILE *fptr, FILE *Outfptr,
 			  HierarchyEntry &TopGrid, TopGridData &MetaData); 
 int OneZoneFreefallTestInitialize(FILE *fptr, FILE *Outfptr, 
 				  HierarchyEntry &TopGrid, TopGridData &MetaData);
+int CloudWindInitialize(FILE *fptr, FILE *Outfptr, HierarchyEntry &TopGrid,
+                        TopGridData &MetaData, ExternalBoundary &Exterior);
+
 int CosmologySimulationInitialize(FILE *fptr, FILE *Outfptr,
                                   HierarchyEntry &TopGrid,
                                   TopGridData &MetaData);
@@ -518,6 +521,10 @@ int InitializeNew(char *filename, HierarchyEntry &TopGrid,
   // 31) GalaxySimulation
   if (ProblemType == 31)
     ret = GalaxySimulationInitialize(fptr, Outfptr, TopGrid, MetaData,Exterior);
+
+  // 32) Cloud in a wind
+  if (ProblemType == 32)
+    ret = CloudWindInitialize(fptr, Outfptr, TopGrid, MetaData, Exterior);
 
   // 35) Shearing Box Simulation
   if (ProblemType == 35) 

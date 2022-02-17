@@ -278,6 +278,8 @@ EXTERN int PointSourceGravity;
 EXTERN FLOAT PointSourceGravityPosition[MAX_DIMENSION];
 EXTERN float PointSourceGravityConstant;
 EXTERN float PointSourceGravityCoreRadius;
+EXTERN float PointSourceGravityCutoffRadius; // LI/WS for the moving subcluster
+EXTERN float CloudWindCentralDensity;                                                                                                                       
 
 /* disk gravity */
 EXTERN int DiskGravity;

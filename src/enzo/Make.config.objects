@@ -83,6 +83,7 @@ OBJS_CONFIG_LIB = \
         cic_interp_c.o \
         cicinterp.o \
         cie_thin_cooling_rate.o \
+        CloudWindInitialize.o \
         cluster_maker.o \
         ClusterInitialize.o \
 	ClusterSMBHSumGasMass.o \
@@ -381,6 +382,7 @@ OBJS_CONFIG_LIB = \
 	Grid_ClearMassFlaggingField.o \
 	Grid_ClearParticleAccelerations.o \
 	Grid_ClearParticleMassFlaggingField.o \
+        Grid_CloudWindInitializeGrid.o \
 	Grid_ClusterInitializeGrid.o \
 	Grid_ClusterSMBHFeedback.o \
         Grid_ClusterSMBHEachGridGasMass.o \

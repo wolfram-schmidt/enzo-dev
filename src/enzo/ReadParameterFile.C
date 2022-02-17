@@ -518,6 +518,10 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
     ret += sscanf(line, "PointSourceGravityCoreRadius = %"FSYM,
 		  &PointSourceGravityCoreRadius);
 
+    ret += sscanf(line, "PointSourceGravityCutoffRadius = %"FSYM,
+                  &PointSourceGravityCutoffRadius); // LI/WS for the cloud in a wind
+    ret += sscanf(line, "CloudWindCentralDensity = %"FSYM,&CloudWindCentralDensity);
+
     ret += sscanf(line, "DiskGravity                        = %"ISYM,&DiskGravity);
     ret += sscanf(line, "DiskGravityPosition                = %"PSYM" %"PSYM" %"PSYM,
       DiskGravityPosition, DiskGravityPosition+1, DiskGravityPosition+2);

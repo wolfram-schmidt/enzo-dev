@@ -450,6 +450,9 @@ int WriteParameterFile(FILE *fptr, TopGridData &MetaData, char *name = NULL)
 	  PointSourceGravityConstant);
   fprintf(fptr, "PointSourceGravityCoreRadius = %"GSYM"\n\n",
 	  PointSourceGravityCoreRadius);
+  fprintf(fptr, "PointSourceGravityCutoffRadius = %"GSYM"\n\n",
+          PointSourceGravityCutoffRadius); // LI/WS for the moving subcluster                                                                                                                     
+  fprintf(fptr, "CloudWindCentralDensity        = %"GSYM"\n", CloudWindCentralDensity);
 
   fprintf(fptr, "DiskGravity                        = %"ISYM"\n",DiskGravity);
   fprintf(fptr, "DiskGravityPosition                = ");

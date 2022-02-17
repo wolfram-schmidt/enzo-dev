@@ -386,6 +386,8 @@ int SetDefaultGlobalValues(TopGridData &MetaData)
   PointSourceGravity           = FALSE;             // off
   PointSourceGravityConstant   = 1.0;
   PointSourceGravityCoreRadius = 0.0;
+  PointSourceGravityCutoffRadius = 0.0;            // LI/WS for the moving subcluster
+  CloudWindCentralDensity = 10.0;
 
   DiskGravity                        = FALSE;
   DiskGravityStellarDiskMass         = 1.0E11;      // Solar Masses
