@@ -950,6 +950,10 @@ gradient force to gravitational force for one-zone collapse test. */
 
    int FlagCellsToBeRefinedByShear();
 
+/* Flag all points that require refining by Vorticity. */
+
+   int FlagCellsToBeRefinedByVorticity();
+
 /* Flag all cells for which tcool < dx/sound_speed. */
 
    int FlagCellsToBeRefinedByCoolingTime();

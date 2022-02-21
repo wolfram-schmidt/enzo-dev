@@ -257,7 +257,15 @@ int grid::SetFlaggingField(int &NumberOfFlaggedCells, int level)
 	}
 	break;
 	
-	/* ==== METHOD 17: undefined ==== */
+	/* ==== METHOD 17: by Vorticity ==== */
+
+      case 17:
+
+        NumberOfFlaggedCells = this->FlagCellsToBeRefinedByVorticity();
+        if (NumberOfFlaggedCells < 0) {
+          ENZO_FAIL("Error in grid->FlagCellsToBeRefinedByVorticity.");
+        }
+        break;
 	
 	/* ==== METHOD 18: BY POSITION OF MUST-REFINE PARTICLES ONLY ABOVE A CERTAIN MASS  ==== */
       case 18:
