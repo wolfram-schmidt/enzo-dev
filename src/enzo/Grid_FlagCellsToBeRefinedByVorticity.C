@@ -154,28 +154,28 @@ int grid::FlagCellsToBeRefinedByVorticity()
 	  }
       LeftOffset *= GridDimension[dim];
       RightOffset *= GridDimension[dim];
-    }  // end loop over dimension
+    } 
+  } // end loop over dimension
 
-    /* Combine all finite differences to determine if criterion is met */
-
-    for (index = 0; index < size; index++) {
-
-      // If ideal gas, then calculate local sound speed
-      if (EOSType == 0) 
-	c_sound2 = Gamma*pressure[index]/BaryonField[DensNum][index];
-      
-      // If nonideal gas, then assume sound speed is 1
-      else 
-	c_sound2 = 1.0;
-      
-      Vorticity = (DelVel1[index]*DelVel1[index] + 
-		   DelVel2[index]*DelVel2[index] + 
-		   DelVel3[index]*DelVel3[index]) / 
-	(Denom*Denom*c_sound2);
-      
-      FlaggingField[index] +=
-        (Vorticity > (MinimumShearForRefinement*MinimumShearForRefinement)) ? 1 : 0;
-    }
+  /* Combine all finite differences to determine if criterion is met */
+  
+  for (index = 0; index < size; index++) {
+    
+    // If ideal gas, then calculate local sound speed
+    if (EOSType == 0) 
+      c_sound2 = Gamma*pressure[index]/BaryonField[DensNum][index];
+    
+    // If nonideal gas, then assume sound speed is 1
+    else 
+      c_sound2 = 1.0;
+    
+    Vorticity = (DelVel1[index]*DelVel1[index] + 
+		 DelVel2[index]*DelVel2[index] + 
+		 DelVel3[index]*DelVel3[index]) / 
+      (Denom*Denom*c_sound2);
+    
+    FlaggingField[index] +=
+      (Vorticity > (MinimumShearForRefinement*MinimumShearForRefinement)) ? 1 : 0;
   }
   
   /* clean up */

@@ -257,7 +257,7 @@ int grid::SetFlaggingField(int &NumberOfFlaggedCells, int level)
 	}
 	break;
 	
-	/* ==== METHOD 17: by Vorticity ==== */
+	/* ==== METHOD 17: BY VORTICITY ==== */
 
       case 17:
 
@@ -286,6 +286,17 @@ int grid::SetFlaggingField(int &NumberOfFlaggedCells, int level)
 	  return FAIL;
 	}
 	break;
+
+	/* ==== METHOD 21: BY RATE OF STRAIN SQUARED  ==== */
+
+      case 21:
+
+        NumberOfFlaggedCells = this->FlagCellsToBeRefinedByRateOfStrainNormSqr();
+        if (NumberOfFlaggedCells < 0) {
+          ENZO_FAIL("Error in grid->FlagCellsToBeRefinedByRateOfStrainNormSqr.");
+        }
+        break;
+	
 	
 	/* ==== METHOD 100: UNDO REFINEMENT IN SOME REGIONS ==== */
 	

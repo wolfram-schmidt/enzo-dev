@@ -101,6 +101,10 @@ grid::~grid()
     }
   }
 
+  for (i = 0; i < MAX_DIMENSION*MAX_DIMENSION; i++) { /// WS
+    if (JacVelWeight[i] != NULL) delete[] JacVelWeight[i];
+  }
+
   delete ParticleAcceleration[MAX_DIMENSION];
  
   for (i = 0; i < MAX_NUMBER_OF_BARYON_FIELDS; i++) {

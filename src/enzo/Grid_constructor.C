@@ -88,6 +88,10 @@ grid::grid()
       FltUB[i] = NULL;
   }
 
+  for (i = 0; i < MAX_DIMENSION*MAX_DIMENSION; i++) { // WS
+    JacVelWeight[i] = NULL;
+  }
+
   ParticleAcceleration[MAX_DIMENSION]      = NULL;
   ActiveParticleAcceleration[MAX_DIMENSION] = NULL;	
  

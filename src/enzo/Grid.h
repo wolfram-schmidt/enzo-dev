@@ -954,6 +954,10 @@ gradient force to gravitational force for one-zone collapse test. */
 
    int FlagCellsToBeRefinedByVorticity();
 
+/* Flag all points that require refining by Rate of Strain Squared. */
+
+   int FlagCellsToBeRefinedByRateOfStrainNormSqr();
+
 /* Flag all cells for which tcool < dx/sound_speed. */
 
    int FlagCellsToBeRefinedByCoolingTime();
@@ -2563,6 +2567,101 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
     void SGS_AddEMF_scale_similarity(float **EMF);
     
     /* END Subgrid-scale modeling framework by P. Grete */
+
+    /* START Control variables framework for refinment by W. Schmidt */
+
+    float ControlVariableAve[MAX_FLAGGING_METHODS];
+    float ControlVariableVar[MAX_FLAGGING_METHODS];
+
+    float *JacVelWeight[MAX_DIMENSION*MAX_DIMENSION];
+                                                                                                                                             
+    /**                                                                                                                                                                    
+     * Computes delta x for the fields for each direction                                                                                                                  
+     *                                                                                                                                                                     
+     * @param direction 0=x,1=y,2=z, (integer)                                                                                                                             
+     * @return delta x (float)                                                                                                                                             
+     */
+    inline float ComputeDelta(const int direction) const
+    {
+      if (direction>=0 && direction<GridRank)
+	  return (GridRightEdge[direction]- GridLeftEdge[direction]) / (GridEndIndex[direction] - GridStartIndex[direction] + 1);
+      else
+	  return -1.0;
+    }
+
+    /**                                                                                                                                                                    
+     * Returns the derivative at point x;                                                                                                                                  
+     * uses a 2-point symmetric method (Accuracy: O(dx)^2) which                                                                                                           
+     * uses the one point before point x and one point after point x                                                                                                       
+     *                                                                                                                                                                     
+     * @param xplus1 (float)                                                                                                                                               
+     * @param xminus1 (float)                                                                                                                                              
+     * @param dx (float)                                                                                                                                                   
+     *                                                                                                                                                                     
+     * @return returns the derivative at point x (float)                                                                                                                   
+     */
+    inline float deriv2(const float xplus1, const float xminus1, const float dx) const
+    {
+      return (xplus1-xminus1)/(2*dx);
+    }
+
+    /**                                                                                                                                                                    
+     * Returns the derivative at point x;                                                                                                                                  
+     * uses a 4-point symmetric method (Accuracy: O(dx)^4) which                                                                                                           
+     * uses the two points before point x and two points after point x                                                                                                     
+     *                                                                                                                                                                     
+     * @param xplus2 (float)                                                                                                                                               
+     * @param xplus1 (float)                                                                                                                                               
+     * @param xminus1 (float)                                                                                                                                              
+     * @param xminus2 (float)                                                                                                                                              
+     * @param dx (float)                                                                                                                                                   
+     *                                                                                                                                                                     
+     * @return returns the derivative at point x (float)                                                                                                                   
+     */
+    inline float deriv4(const float xplus2, const float xplus1, const float xminus1, const float xminus2,const float dx) const
+    {
+      return  (-xplus2+8*xplus1-8*xminus1+xminus2)/(12*dx);
+    }
+
+    /**                                                                                                                                                                    
+     * Returns the 2nd derivative at point x;                                                                                                                              
+     * uses a 5-point symmetric method (Accuracy: O(dx)^4) which                                                                                                           
+     * uses the two points before point x, point x and two points after point x                                                                                            
+     *                                                                                                                                                                     
+     * @param xplus2 (float)                                                                                                                                               
+     * @param xplus1 (float)                                                                                                                                               
+     * @param x (float)                                                                                                                                                    
+     * @param xminus1 (float)                                                                                                                                              
+     * @param xminus2 (float)                                                                                                                                              
+     * @param dx (float)                                                                                                                                                   
+     *                                                                                                                                                                     
+     * @return returns the 2nd derivative at point x (float)                                                                                                               
+     */
+    inline float dderiv4(const float xplus2, const float xplus1, const float x, const float xminus1, const float xminus2, const float dx) const
+    {
+      return  (-xplus2+16*xplus1-30*x+16*xminus1-xminus2)/(12*dx*dx);
+    }
+
+    // Member functions defined in Grid_ComputeJacobianVelocity.C
+
+    int ComputeJacobianVelocity(int weighing);                                                                                                                       
+    int ComputeJacobianVelocityNormSqr(float* JacVelNormSqr);                                                                                                                         
+    int ComputeNonLinearScalar(float* NonLinScalar);                                                                                                                                  
+    int ComputeRateOfStrainNormSqr(float* STNormSqr, int tracefree);
+    int ComputeVorticityNormSqr(float* VortNormSqr);
+    int ComputeDivergence(float* Div);
+
+    // Member functions defined in Grid_ComputeRateOfCompression.C                                                                                                         
+
+    //int ComputeRateOfCompression(float* RateOfCompression);
+    //int ComputeGradient(float* scalar, float* pderiv, float delta, int dim);
+    //int ComputeLaplacian(float* scalar, float* Laplacian, float* delta);
+    //int ComputeDivAcceleration(float* div, float* delta);
+    //int ComputeDivInvRhoGradPressure(float* div, float* delta);
+
+    //int ComputeControlVariables(int level);
+
+    /* END Control variables framework for refinment by W. Schmidt */
 
 /* Comoving coordinate expansion terms. */
 
