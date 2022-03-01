@@ -118,6 +118,7 @@ OBJS_CONFIG_LIB = \
         CommunicationUpdateStarParticleCount.o \
         CommunicationUtilities.o \
         ComputeDomainBoundaryMassFlux.o \
+	ComputeControlVariables.o \
 	ConductionBubbleInitialize.o \
 	ConductionCloudInitialize.o \
 	ConductionTestInitialize.o \
@@ -409,6 +410,7 @@ OBJS_CONFIG_LIB = \
 	Grid_ComputeAccelerationsFromExternalPotential.o \
 	Grid_ComputeCellCenteredField.o \
 	Grid_ComputeConductionTimeStep.o \
+	Grid_ComputeControlVariables.o \
 	Grid_ComputeCoolingTime.o \
         Grid_ComputeCRDiffusion.o \
         Grid_ComputeCRDiffusionTimeStep.o \
@@ -495,13 +497,13 @@ OBJS_CONFIG_LIB = \
 	Grid_FlagCellsToBeRefinedByMetallicity.o \
 	Grid_FlagCellsToBeRefinedByMetalMass.o \
 	Grid_FlagCellsToBeRefinedByMustRefineRegion.o \
-	Grid_FlagCellsToBeRefinedByRateOfStrainNormSqr.o \
 	Grid_FlagCellsToBeRefinedByResistiveLength.o \
 	Grid_FlagCellsToBeRefinedByShear.o \
 	Grid_FlagCellsToBeRefinedByShocks.o \
 	Grid_FlagCellsToBeRefinedByShockwaves.o \
 	Grid_FlagCellsToBeRefinedBySlope.o \
 	Grid_FlagCellsToBeRefinedBySecondDerivative.o \
+	Grid_FlagCellsToBeRefinedByVariability.o \
 	Grid_FlagCellsToBeRefinedByVorticity.o \
 	Grid_FlagRefinedCells.o \
 	Grid_FlagGridArray.o \

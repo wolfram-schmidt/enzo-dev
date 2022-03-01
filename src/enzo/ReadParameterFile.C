@@ -344,6 +344,12 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
 	     CellFlaggingMethod+0, CellFlaggingMethod+1, CellFlaggingMethod+2,
 	     CellFlaggingMethod+3, CellFlaggingMethod+4, CellFlaggingMethod+5,
 	     CellFlaggingMethod+6);
+    ret += sscanf(line, "ThreshMin              = %"FSYM" %"FSYM" %"FSYM" %"FSYM" %"FSYM" %"FSYM" %"FSYM,
+                  ThreshMin+0, ThreshMin+1, ThreshMin+2, ThreshMin+3,
+                  ThreshMin+4, ThreshMin+5, ThreshMin+6);
+    ret += sscanf(line, "ThreshFct              = %"FSYM" %"FSYM" %"FSYM" %"FSYM" %"FSYM" %"FSYM" %"FSYM,
+                  ThreshFct+0, ThreshFct+1, ThreshFct+2, ThreshFct+3,
+                  ThreshFct+4, ThreshFct+5, ThreshFct+6);
     ret += sscanf(line, "FluxCorrection         = %"ISYM, &FluxCorrection);
     ret += sscanf(line, "UseCoolingTimestep     = %"ISYM, &UseCoolingTimestep);
     ret += sscanf(line, "CoolingTimestepSafetyFactor = %"FSYM, &CoolingTimestepSafetyFactor);

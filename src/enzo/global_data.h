@@ -187,6 +187,10 @@ EXTERN int MetallicityRefinementMinLevel;
 EXTERN float MetallicityRefinementMinMetallicity;
 EXTERN float MetallicityRefinementMinDensity;
 
+/* WS: minimal thresholds for refinement by grid variability */
+EXTERN float ThreshMin[MAX_FLAGGING_METHODS];
+EXTERN float ThreshFct[MAX_FLAGGING_METHODS];
+
 /* Velocity to limit timesteps */
 
 EXTERN float TimestepSafetyVelocity;

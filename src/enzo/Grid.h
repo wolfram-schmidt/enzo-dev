@@ -199,6 +199,7 @@ class grid
   int   *FlaggingField;             // Boolean flagging field (for refinement)
   float *MassFlaggingField;         // Used by mass flagging criteria
   float *ParticleMassFlaggingField; // Used by particle mass flagging criteria
+  float *ControlVariable[MAX_FLAGGING_METHODS]; // Used by variability flagging criteria
 //
 //  Parallel Information
 //
@@ -864,7 +865,6 @@ gradient force to gravitational force for one-zone collapse test. */
 
    int SetFlaggingField(int &NumberOfFlaggedCells, int level);
 
-
 /* Set flagging field from refine regions */
 
    int SetFlaggingFieldMultiRefineRegions(int level);
@@ -876,6 +876,11 @@ gradient force to gravitational force for one-zone collapse test. */
 /* Delete flagging field */
 
    void DeleteFlaggingField();
+
+/* WS: control variables for refinement by variability */
+
+   int ComputeControlVariables(int &active_zones, float* sum, float* sum_of_sqrs);
+   //   int ComputeControlVariables();
 
 /* Particles: deposit particles living in this grid into the Mass Flagging
              field (gg #2) */
@@ -954,9 +959,9 @@ gradient force to gravitational force for one-zone collapse test. */
 
    int FlagCellsToBeRefinedByVorticity();
 
-/* Flag all points that require refining by Rate of Strain Squared. */
+/* Flag all cells in which the control variables exceed their variability thresholds. */
 
-   int FlagCellsToBeRefinedByRateOfStrainNormSqr();
+   int FlagCellsToBeRefinedByVariability(int level);
 
 /* Flag all cells for which tcool < dx/sound_speed. */
 
@@ -2658,8 +2663,6 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
     //int ComputeLaplacian(float* scalar, float* Laplacian, float* delta);
     //int ComputeDivAcceleration(float* div, float* delta);
     //int ComputeDivInvRhoGradPressure(float* div, float* delta);
-
-    //int ComputeControlVariables(int level);
 
     /* END Control variables framework for refinment by W. Schmidt */
 

@@ -140,6 +140,9 @@ grid::grid()
   ParticleMassFlaggingField     = NULL;
   MassFlaggingField             = NULL;
   FlaggingField                 = NULL;
+  for (i = 0; i < MAX_FLAGGING_METHODS; i++) { // WS
+    ControlVariable[i] = NULL;
+  }
 
 #ifdef TRANSFER
   NumberOfPhotonPackages = 0;

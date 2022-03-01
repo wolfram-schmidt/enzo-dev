@@ -287,16 +287,13 @@ int grid::SetFlaggingField(int &NumberOfFlaggedCells, int level)
 	}
 	break;
 
-	/* ==== METHOD 21: BY RATE OF STRAIN SQUARED  ==== */
+        /* ==== DUMMIES for grid variability methods in range MIN_METHOD_VARIABILITY to MAX_METHOD_VARIABILITY ==== */
+
+      case 20:
+	break;
 
       case 21:
-
-        NumberOfFlaggedCells = this->FlagCellsToBeRefinedByRateOfStrainNormSqr();
-        if (NumberOfFlaggedCells < 0) {
-          ENZO_FAIL("Error in grid->FlagCellsToBeRefinedByRateOfStrainNormSqr.");
-        }
-        break;
-	
+	break;
 	
 	/* ==== METHOD 100: UNDO REFINEMENT IN SOME REGIONS ==== */
 	
@@ -327,6 +324,15 @@ int grid::SetFlaggingField(int &NumberOfFlaggedCells, int level)
 	       CellFlaggingMethod[method], NumberOfFlaggedCells);
     } 
   } // ENDFOR methods
+
+  /* ==== REFINEMENT BY GRID VARIABILITY (loops through methods) ==== */
+
+  NumberOfFlaggedCells = this->FlagCellsToBeRefinedByVariability(level);
+  if (NumberOfFlaggedCells < 0) {
+    fprintf(stderr, "Error in grid->FlagCellsToBeRefinedByVariability.\n");
+    return FAIL;
+  }
+
  
   /* End of Cell flagging criterion routine                              */
   /***********************************************************************/

@@ -134,7 +134,11 @@ grid::~grid()
   delete [] FlaggingField;
   delete [] MassFlaggingField;
   delete [] ParticleMassFlaggingField;
- 
+
+  for (i = 0; i < MAX_FLAGGING_METHODS; i++) { // WS
+    if (ControlVariable[i] != NULL) delete[] ControlVariable[i];
+  }
+
   for (i = 0; i < MAX_NUMBER_OF_PARTICLE_ATTRIBUTES; i++)
     delete [] ParticleAttribute[i];
 

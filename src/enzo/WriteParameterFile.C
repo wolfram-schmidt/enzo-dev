@@ -324,6 +324,10 @@ int WriteParameterFile(FILE *fptr, TopGridData &MetaData, char *name = NULL)
 	  MaximumParticleRefinementLevel);
   fprintf(fptr, "CellFlaggingMethod             = ");
   WriteListOfInts(fptr, MAX_FLAGGING_METHODS, CellFlaggingMethod);
+  fprintf(fptr, "ThreshMin              = "); // WS                                                                                         
+  WriteListOfFloats(fptr, MAX_FLAGGING_METHODS, ThreshMin);
+  fprintf(fptr, "ThreshFct              = "); // WS
+  WriteListOfFloats(fptr, MAX_FLAGGING_METHODS, ThreshFct);
   for (int i = 0; i<EnabledActiveParticlesCount; i++){
     fprintf(fptr, "AppendActiveParticleType = %s\n",
             EnabledActiveParticles[i]->particle_name.c_str());

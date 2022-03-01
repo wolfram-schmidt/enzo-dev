@@ -224,6 +224,8 @@ int SetDefaultGlobalValues(TopGridData &MetaData)
     MinimumSlopeForRefinement[i]= 0.3;
     SlopeFlaggingFields[i] = INT_UNDEFINED;
     CellFlaggingMethod[i]       = INT_UNDEFINED;
+    ThreshMin[i] = 0.0; //WS: minimal threshold for refinement
+    ThreshFct[i] = 1.0; //WS: threshold factor 
     MinimumMassForRefinement[i] = FLOAT_UNDEFINED;   // usually set by:
     MinimumOverDensityForRefinement[i]       = 1.5;
     MinimumMassForRefinementLevelExponent[i] = 0;
