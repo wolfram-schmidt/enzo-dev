@@ -426,7 +426,8 @@ OBJS_CONFIG_LIB = \
 	Grid_ComputeMetalLineLuminosity.o \
         Grid_ComputeOneZoneCollapseFactor.o \
 	Grid_ComputePressure.o \
-	Grid_ComputeRandomForcingFields.o\
+	Grid_ComputeRandomForcingFields.o \
+	Grid_ComputeRateOfCompression.o \
 	Grid_ComputeTemperatureField.o \
 	Grid_ComputeTimeStep.o \
         Grid_ComputeVectorAnalysisFields.o \

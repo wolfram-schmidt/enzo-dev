@@ -1,4 +1,18 @@
-// LI implemented in this Enzo version the modifications performed originally by WS, Oct. 2011
+/***********************************************************************
+/
+/  GRID CLASS (COMPUTE JACOBIAN OF WEIGHTED VELOCITY)
+/
+/  written by: Wolfram Schmidt
+/  date:       April 2006
+/  modified:   February 2022
+/
+/  PURPOSE: computes Jacobian of the velocity
+/           used for structural invariants (vorticity modulus,
+/           norm or rate of strain, etc.) in cell flagging methods
+/
+/  RETURNS: error status
+/
+************************************************************************/
 
 #include <stdio.h>
 #include <math.h>
@@ -24,7 +38,7 @@ int CosmologyComputeExpansionFactor(FLOAT time, FLOAT *a, FLOAT *dadt);
  * for weighing > 0, the velocity is weighted by the mass density to the power 1/n,
  *    where n = 1 + weighing
  * if the flag fluctuation is set, the averaged velocity field is substracted provided that
- *    the global flag ShearImproved is set
+ *    the global flag ShearImproved is set (currently not implemented)
  *
  * @return returns SUCCESS or FAIL
  */
@@ -234,10 +248,8 @@ int grid::ComputeJacobianVelocity(int weighing)
 	
 	for(int dim=0;dim<GridRank;++dim)
 	{
-	  //StartIndex[dim]=GridStartIndex[dim]-1;
-	  //EndIndex[dim]=GridEndIndex[dim]+1;
-		StartIndex[dim]=GridStartIndex[dim];
-		EndIndex[dim]=GridEndIndex[dim];
+	    StartIndex[dim]=GridStartIndex[dim];
+	    EndIndex[dim]=GridEndIndex[dim];
 	}
 	
 	int rank_sqr=GridRank*GridRank;	
@@ -353,8 +365,6 @@ int grid::ComputeJacobianVelocityNormSqr(float* JacVelWeightNormSqr)
 	int size = 1;
 	for (int dim = 0; dim < GridRank; dim++)
 	    size *= GridDimension[dim];
-
-	//cout << "[" << MyProcessorNumber << "]" << " Computing squared norm of rate of strain, size = " << size << endl;
 
 	switch(GridRank)
 	{

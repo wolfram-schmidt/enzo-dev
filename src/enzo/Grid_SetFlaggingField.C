@@ -294,6 +294,9 @@ int grid::SetFlaggingField(int &NumberOfFlaggedCells, int level)
 
       case 21:
 	break;
+
+      case 22:
+	break;
 	
 	/* ==== METHOD 100: UNDO REFINEMENT IN SOME REGIONS ==== */
 	

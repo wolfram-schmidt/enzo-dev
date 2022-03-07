@@ -1,4 +1,16 @@
-// LI implemented in this Enzo version the modifications performed originally by WS, Jan. 2012
+/***********************************************************************
+/
+/  COMPUTE CONTROL VARIABLES
+/
+/  written by: Wolfram Schmidt
+/  date:       Feburary 2022
+/
+/  PURPOSE: computes control variables for refinement by variability
+/           and increments sums over all cells at given refinment level
+/
+/  RETURNS: error status
+/
+************************************************************************/
 
 #include <stdio.h>
 #include <string.h>
@@ -36,11 +48,13 @@ int ComputeControlVariables(HierarchyEntry *Grid, int level, int &active_zones, 
   float grid_sum[MAX_FLAGGING_METHODS];
   float grid_sum_of_sqrs[MAX_FLAGGING_METHODS];
  
-  /* Compute control variables and statistical moments.
-     TODO: only apply if refinment by variability is used */
+  /* Compute control variables and grid sums. */
+
   if (CurrentGrid->ComputeControlVariables(grid_active_zones, grid_sum, grid_sum_of_sqrs) == FAIL) {
     ENZO_FAIL("Error in grid->ComputeControlVariables.");
   }
+
+  /* Increment sums for refinement level. */
 
   active_zones += grid_active_zones;
   for (int method = 0; method < MAX_FLAGGING_METHODS; method++)

@@ -880,7 +880,6 @@ gradient force to gravitational force for one-zone collapse test. */
 /* WS: control variables for refinement by variability */
 
    int ComputeControlVariables(int &active_zones, float* sum, float* sum_of_sqrs);
-   //   int ComputeControlVariables();
 
 /* Particles: deposit particles living in this grid into the Mass Flagging
              field (gg #2) */
@@ -2658,11 +2657,9 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
 
     // Member functions defined in Grid_ComputeRateOfCompression.C                                                                                                         
 
-    //int ComputeRateOfCompression(float* RateOfCompression);
-    //int ComputeGradient(float* scalar, float* pderiv, float delta, int dim);
-    //int ComputeLaplacian(float* scalar, float* Laplacian, float* delta);
-    //int ComputeDivAcceleration(float* div, float* delta);
-    //int ComputeDivInvRhoGradPressure(float* div, float* delta);
+    int ComputeRateOfCompression(float* RateOfCompression);
+    int ComputeDivAcceleration(float* div, float* delta);
+    int ComputeDivInvRhoGradPressure(float* div, float* delta);
 
     /* END Control variables framework for refinment by W. Schmidt */
 

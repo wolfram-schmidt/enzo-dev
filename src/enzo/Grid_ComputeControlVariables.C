@@ -1,10 +1,15 @@
 /***********************************************************************
 /
-/  GRID CLASS (COMPUTE STRUCTURAL INVARIANTS)
+/  GRID CLASS (COMPUTE CONTROL VARIABLES)
 /
 /  written by: Wolfram Schmidt
 /  date:       April 2006
 /  modified:   Feburary 2022
+/
+/  PURPOSE: computes control variables and sums over all grid cells
+/           for refinement by variability
+/
+/  RETURNS: error status
 /
 ************************************************************************/
 
@@ -22,7 +27,6 @@
 using namespace std;
 
 int grid::ComputeControlVariables(int &active_zones, float* sum, float* sum_of_sqrs)
-//int grid::ComputeControlVariables()
 {
     if (ProcessorNumber != MyProcessorNumber)
 	return SUCCESS;
@@ -78,22 +82,20 @@ int grid::ComputeControlVariables(int &active_zones, float* sum, float* sum_of_s
 	case 21:
 	  
 	  if (this->ComputeRateOfStrainNormSqr(ControlVariable[method], 0) == FAIL) {
-	    fprintf(stderr, "Error in grid->ComputeVorticityNormSqr.\n");
+	    fprintf(stderr, "Error in grid->ComputeRateOfStrainNormSqr.\n");
 	    return FAIL;
 	  }  
 	  break;
 	  
-	  /* ==== METHOD 22: BY RATE OF COMPRESSION ====
+	  /* ==== METHOD 22: BY RATE OF COMPRESSION ==== */
 		  
 	case 22:
 	  
 	  if (this->ComputeRateOfCompression(ControlVariable[method]) == FAIL) {
-	    fprintf(stderr, "Error in grid->ComputeVorticityNormSqr.\n");
+	    fprintf(stderr, "Error in grid->ComputeRateOfCompression.\n");
 	    return FAIL;
 	  }
           break;	  
-
-	  */
   
 	default:
 	  ENZO_VFAIL("CellFlaggingMethod[%"ISYM"] = %"ISYM" not implemented for refinement by variability\n", 
@@ -108,10 +110,9 @@ int grid::ComputeControlVariables(int &active_zones, float* sum, float* sum_of_s
 	      sum[method] += ControlVariable[method][index];
 	      sum_of_sqrs[method] += ControlVariable[method][index]*ControlVariable[method][index];
 	    }
-	/*
-	cout << "[" << MyProcessorNumber << "] method " << CellFlaggingMethod[method]
-	     << ", sum =  " << sum[method] << " sum of sqrs =  " << sum_of_sqrs[method] << endl;
-	*/
+	
+	//cout << "[" << MyProcessorNumber << "] method " << CellFlaggingMethod[method]
+	//   << ", sum =  " << sum[method] << " sum of sqrs =  " << sum_of_sqrs[method] << endl;
       }
     }
 

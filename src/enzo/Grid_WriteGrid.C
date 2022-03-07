@@ -549,12 +549,15 @@ int grid::WriteGrid(FILE *fptr, char *base_name, int grid_id)
       }
 
 
-      io_type *curlx; io_type *curly;
+      float *buf;
+      io_type *compr; io_type *curlx; io_type *curly;
 
       
       if(GridRank==3){
-      curlx = new io_type [size];
-      curly = new io_type [size];}
+	buf = new float[size];
+	compr = new io_type [size];
+	curlx = new io_type [size];
+	curly = new io_type [size];}
 
 
       io_type *curlz = new io_type [size];
@@ -562,9 +565,20 @@ int grid::WriteGrid(FILE *fptr, char *base_name, int grid_id)
 
       FLOAT dx = CellWidth[0][0],
 	dy = CellWidth[1][0], dz;
-      if (GridRank>2)
+      if (GridRank>2) {
 	dz = CellWidth[2][0];
-    
+	/*
+	if (this->ComputeJacobianVelocity(0) == FAIL) {
+	  fprintf(stderr, "Error in grid->ComputeJacobianVelocity.\n");
+	  return FAIL;
+	}
+	*/
+	if (this->ComputeRateOfCompression(buf) == FAIL) {
+	  fprintf(stderr, "Error in grid->ComputeRateOfCompression.\n");
+	  return FAIL;
+	}
+      }
+        
       /* Copy active part of field into grid */
       int igrid, igridyp1, igridym1, igridzp1, igridzm1;
       for (int k = GridStartIndex[2]; k <= GridEndIndex[2]; k++) {
@@ -610,6 +624,10 @@ int grid::WriteGrid(FILE *fptr, char *base_name, int grid_id)
 		      (0.5*(BaryonField[Vel2Num][igrid+1]-BaryonField[Vel2Num][igrid-1])/dx -		      
 			  0.5*(BaryonField[Vel1Num][igridyp1]-BaryonField[Vel1Num][igridym1])/dy)
 		      );
+
+	    compr[(i-GridStartIndex[0])+
+		 (j-GridStartIndex[1])*ActiveDim[0]+
+		 (k-GridStartIndex[2])*ActiveDim[0]*ActiveDim[1] ] = buf[igrid];
 	    }
 
 	    if (GridRank==2){
@@ -648,12 +666,13 @@ int grid::WriteGrid(FILE *fptr, char *base_name, int grid_id)
 	DataLabelN[1]="Velocity_Vorticity1";
 	DataLabelN[2]="Velocity_Vorticity2";
 	DataLabelN[3]="Velocity_Vorticity3";
+	DataLabelN[4]="Velocity_Compression";
       }
 
       
 
-      int tFields=3;
-      if (GridRank==2) tFields=1;
+      int tFields=5;
+      if (GridRank==2) tFields=2;
 
 
       for (int field=0; field<=tFields; field++){
@@ -690,7 +709,8 @@ int grid::WriteGrid(FILE *fptr, char *base_name, int grid_id)
 	temp=curly;
       case 3:
 	temp=curlx;
-
+      case 4:
+	temp=compr;
       }
  
       h5_status = H5Dwrite(dset_id, float_type_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, (VOIDP) temp);
@@ -712,6 +732,8 @@ int grid::WriteGrid(FILE *fptr, char *base_name, int grid_id)
 
 
       if(GridRank==3){
+	delete buf;
+	delete compr;
 	delete curlx;
 	delete curly;}
       delete curlz;

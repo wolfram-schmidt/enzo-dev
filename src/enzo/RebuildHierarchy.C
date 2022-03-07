@@ -409,8 +409,6 @@ int RebuildHierarchy(TopGridData *MetaData,
       
       // sum over all grids on this level
       for (j = 0; j < grids; j++) {
-	//if (GridHierarchyPointer[j]->GridData->ComputeControlVariables(grid_active_zones, grid_sum, grid_sum_of_sqrs) == FAIL) {
-	//if (GridHierarchyPointer[j]->GridData->ComputeControlVariables() == FAIL) {
 	if (ComputeControlVariables(GridHierarchyPointer[j], i, level_active_zones, level_sum, level_sum_of_sqrs) == FAIL) {
 	  ENZO_FAIL("Error in ComputeControlVariables.");
 	}
