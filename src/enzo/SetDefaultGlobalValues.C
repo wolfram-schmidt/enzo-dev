@@ -442,6 +442,7 @@ int SetDefaultGlobalValues(TopGridData &MetaData)
   }
 
   UseSGSModel = 0; // off
+  SGSEnergies = 0; // compute and output energy variables
   SGSFilterStencil = 0; // the one-dimensional stencil of the complete filter 
   SGSNeedJacobians = 0; // set automatically in ReadParameter file 
   SGSNeedMixedFilteredQuantities = 0; // set automatically in ReadParameter file

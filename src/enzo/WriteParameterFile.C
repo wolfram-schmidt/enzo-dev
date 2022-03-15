@@ -531,6 +531,7 @@ int WriteParameterFile(FILE *fptr, TopGridData &MetaData, char *name = NULL)
   if (DrivenFlowProfile)
     Forcing.WriteParameters(fptr);
   fprintf(fptr, "UseSGSModel                    = %"ISYM"\n", UseSGSModel);
+  fprintf(fptr, "SGSEnergies                    = %"ISYM"\n", SGSEnergies);
   fprintf(fptr, "SGSFilterWidth                 = %"FSYM"\n", SGSFilterWidth);
   fprintf(fptr, "SGSFilterStencil               = %"ISYM"\n", SGSFilterStencil);
   fprintf(fptr, "SGSFilterWeights               = %"FSYM" %"FSYM" %"FSYM" %"FSYM"\n",

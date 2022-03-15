@@ -47,6 +47,7 @@ int CloudWindInitialize(FILE *fptr, FILE *Outfptr,
   char *Vel2Name = "y-velocity";
   char *Vel3Name = "z-velocity";
   char *GEName     = "Internal_Energy";
+  char *MetalName   = "Metal_Density";
   char *ColourName = "colour";
   char *AveMomt1Name = "AveMomtX";
   char *AveMomt2Name = "AveMomtY";
@@ -70,7 +71,9 @@ int CloudWindInitialize(FILE *fptr, FILE *Outfptr,
   float CloudWindExternalTotalEnergy = 2.0;
   float CloudWindCentralTotalEnergy = 5.0;
   float CloudWindHSETolerance = 1e-1;
-    int CloudWindUnbound = 0;
+  float CloudWindMetallicity = 1.0e-10;
+  int   CloudWindUseMetallicityField = FALSE;
+  int   CloudWindUnbound = FALSE;
 
   int   HereGridRank = MetaData.TopGridRank;
   FLOAT CloudWindSubgridLeft = 0.0;        // start of subgrid
@@ -100,6 +103,8 @@ int CloudWindInitialize(FILE *fptr, FILE *Outfptr,
     ret += sscanf(line, "CloudWindCentralTotalEnergy = %"FSYM, &CloudWindCentralTotalEnergy);
     ret += sscanf(line, "CloudWindBeta = %"FSYM, &CloudWindBeta);
     ret += sscanf(line, "CloudWindHSETolerance = %"FSYM, &CloudWindHSETolerance);
+    ret += sscanf(line, "CloudWindMetallicity = %"FSYM, &CloudWindMetallicity);
+    ret += sscanf(line, "CloudWindUseMetallicityField = %"ISYM, &CloudWindUseMetallicityField);
     ret += sscanf(line, "CloudWindUnbound = %"ISYM, &CloudWindUnbound);
     ret += sscanf(line, "CloudWindSubgridLeft = %"PSYM, &CloudWindSubgridLeft);
     ret += sscanf(line, "CloudWindSubgridRight = %"PSYM, &CloudWindSubgridRight);
@@ -120,6 +125,8 @@ int CloudWindInitialize(FILE *fptr, FILE *Outfptr,
     printf("CloudWindExternalTotalEnergy = %f\n", CloudWindExternalTotalEnergy);
     printf("CloudWindCentralTotalEnergy = %f\n", CloudWindCentralTotalEnergy);
     printf("CloudWindBeta = %f\n", CloudWindBeta);
+    printf("CloudWindMetallicity = %f\n", CloudWindMetallicity);
+    printf("CloudWindUseMetallicityField  = %d\n"  , CloudWindUseMetallicityField);
     printf("CloudWindHSETolerance = %f\n", CloudWindHSETolerance); 
     printf("CloudWindUnbound  = %d\n"  , CloudWindUnbound);
     printf("CloudWindSubgridLeft  = %f\n"  , CloudWindSubgridLeft);
@@ -136,6 +143,8 @@ int CloudWindInitialize(FILE *fptr, FILE *Outfptr,
 						CloudWindExternalTotalEnergy,
 						CloudWindCentralTotalEnergy,
 						CloudWindBeta,
+						CloudWindMetallicity,
+						CloudWindUseMetallicityField,
 						CloudWindHSETolerance,
 						CloudWindUnbound) == FAIL) {
     ENZO_FAIL("Error in CloudWindInitializeGrid.\n")
@@ -180,6 +189,8 @@ int CloudWindInitialize(FILE *fptr, FILE *Outfptr,
 						    CloudWindExternalTotalEnergy,
 						    CloudWindCentralTotalEnergy,
 						    CloudWindBeta,
+						    CloudWindMetallicity,
+						    CloudWindUseMetallicityField,
 						    CloudWindHSETolerance,
 						    CloudWindUnbound
 						    ) == FAIL) {
@@ -256,6 +267,8 @@ int CloudWindInitialize(FILE *fptr, FILE *Outfptr,
 						   CloudWindExternalTotalEnergy,
 						   CloudWindCentralTotalEnergy,
 						   CloudWindBeta,
+						   CloudWindMetallicity,
+						   CloudWindUseMetallicityField,
 						   CloudWindHSETolerance,
 						   CloudWindUnbound) == FAIL) {
       ENZO_FAIL("Error in CloudWindInitializeGrid.\n");
@@ -274,6 +287,8 @@ int CloudWindInitialize(FILE *fptr, FILE *Outfptr,
   DataLabel[count++] = Vel2Name;
   if (HereGridRank != 2)
       DataLabel[count++] = Vel3Name;
+  if (CloudWindUseMetallicityField)
+      DataLabel[count++] = MetalName;
   /* TODO  
   if (SGSModel) {
     if (ShearImproved) {
@@ -298,6 +313,8 @@ int CloudWindInitialize(FILE *fptr, FILE *Outfptr,
   InflowValue[index++] = 0.0;
   if (HereGridRank != 2)
       InflowValue[index++] = 0.0;
+  if (CloudWindUseMetallicityField)
+      InflowValue[index++] = 1.0e-12;
   /* TODO
   if (SGSModel) {
     if (ShearImproved) {
@@ -335,6 +352,8 @@ int CloudWindInitialize(FILE *fptr, FILE *Outfptr,
     fprintf(Outfptr, "CloudWindExternalTotalEnergy = %f\n", CloudWindExternalTotalEnergy);
     fprintf(Outfptr, "CloudWindCentralTotalEnergy = %f\n", CloudWindCentralTotalEnergy);
     fprintf(Outfptr, "CloudWindBeta = %f\n", CloudWindBeta);
+    fprintf(Outfptr, "CloudWindMetallicity = %f\n", CloudWindMetallicity);
+    fprintf(Outfptr, "CloudWindUseMetallicityField = %f\n", CloudWindUseMetallicityField);
     fprintf(Outfptr, "CloudWindHSETolerance = %f\n", CloudWindHSETolerance); 
     fprintf(Outfptr, "CloudWindUnbound  = %f\n"  , CloudWindUnbound);
     fprintf(Outfptr, "CloudWindSubgridLeft  = %f\n"  , CloudWindSubgridLeft);
@@ -344,7 +363,8 @@ int CloudWindInitialize(FILE *fptr, FILE *Outfptr,
 
 #ifdef USE_MPI
 
-  // BWO: this forces the synchronization of the various point source gravity                                                                                                                         // parameters between processors.  If this is not done, things go to pieces!
+  // BWO: this forces the synchronization of the various point source gravity
+  // parameters between processors.  If this is not done, things go to pieces!
 
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Datatype DataType = (sizeof(float) == 4) ? MPI_FLOAT : MPI_DOUBLE;

@@ -2052,14 +2052,16 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
   /* LI: Initialize a grid for the Moving Subcluster problem.  */
 
   int CloudWindInitializeGrid(float CloudWindVelocity,
-                                     FLOAT CloudWindCutoffRadius,
-                                     float CloudWindCentralDensity,
-                                     float CloudWindExternalDensity,
-                                     float CloudWindExternalTotalEnergy,
-                                     float CloudWindCentralTotalEnergy,
-                                     float CloudWindBeta,
-                                     float CloudWindHSETolerance,
-				     int CloudWindUnbound);
+			      float CloudWindCutoffRadius,
+			      float CloudWindCentralDensity,
+			      float CloudWindExternalDensity,
+			      float CloudWindExternalTotalEnergy,
+			      float CloudWindCentralTotalEnergy,
+			      float CloudWindBeta,
+			      float CloudWindMetallicity,
+			      int   CloudWindUseMetallicityField,
+			      float CloudWindHSETolerance,
+			      int   CloudWindUnbound);
 
   /* Initialize a grid and set boundary for the 2D/3D Noh problem. */
 

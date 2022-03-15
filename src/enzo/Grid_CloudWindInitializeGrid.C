@@ -35,14 +35,16 @@
 using namespace std;
 
 int grid::CloudWindInitializeGrid(float CloudWindVelocity,
-					 FLOAT CloudWindCutoffRadius,
-					 float CloudWindCentralDensity,
-					 float CloudWindExternalDensity,
-					 float CloudWindExternalTotalEnergy,
-					 float CloudWindCentralTotalEnergy,
-					 float CloudWindBeta,
-					 float CloudWindHSETolerance,
-                                           int CloudWindUnbound)
+				  float CloudWindCutoffRadius,
+				  float CloudWindCentralDensity,
+				  float CloudWindExternalDensity,
+				  float CloudWindExternalTotalEnergy,
+				  float CloudWindCentralTotalEnergy,
+				  float CloudWindBeta,
+				  float CloudWindMetallicity,
+				  int   CloudWindUseMetallicityField,
+				  float CloudWindHSETolerance,
+				  int   CloudWindUnbound)
 {
 
   /* create fields */
@@ -57,12 +59,11 @@ int grid::CloudWindInitializeGrid(float CloudWindVelocity,
   FieldType[NumberOfBaryonFields++] = Velocity1;
   FieldType[NumberOfBaryonFields++] = Velocity2;
   FieldType[NumberOfBaryonFields++] = Velocity3;
-       
-  /* TODO
-  int SGSENum = NumberOfBaryonFields;
-  if (SGSModel)                    
-      FieldType[NumberOfBaryonFields++] = SGSTurbEnergyDensity;  
+  int MetalNum = NumberOfBaryonFields;
+  if (CloudWindUseMetallicityField)
+    FieldType[NumberOfBaryonFields++] = Metallicity;
 
+  /* TODO
   int AveMomt1Num, AveMomt2Num, AveMomt3Num;	
   if (SGSModel && ShearImproved)
   {
@@ -81,12 +82,12 @@ int grid::CloudWindInitializeGrid(float CloudWindVelocity,
 
   /* Return if this doesn't concern us. */
 
-    if (ProcessorNumber != MyProcessorNumber)
+  if (ProcessorNumber != MyProcessorNumber)
     return SUCCESS;
 
   /* declarations */
 
-  int size, dim, field, i, j, k, n;
+  int size, dim, field, i, j, k, n, index;
   FLOAT r;
 
   float MappingUnit;
@@ -94,150 +95,148 @@ int grid::CloudWindInitializeGrid(float CloudWindVelocity,
   int ii, iter;
   float *peos, phse, *dens;
   FLOAT *radius;
-  float *grav, dens_zone, pres_zone, dens_map;
+  float *grav, dens_zone, pres_zone, dens_intpl;
   float accel, drho;
   FLOAT rad, rcubed, rcore;
   bool converge;
   FILE *original_model, *hse_model;
   const int max_iter = 50000; 
 
-/*   HSE part begins. It is executed, unless we initialize a 
-     cloud without internal structure and gravity             */         
-
-  if (CloudWindUnbound == 0) {
+  /*   HSE part begins. It is executed, unless we initialize a 
+       cloud without internal structure and gravity             */         
 
   HSECellNumber = 0;
-  for (dim = 0; dim < GridRank; dim++) {
-    if (HSECellNumber < GridDimension[dim]) {
-      HSECellNumber = GridDimension[dim];
-    }      
-  }           
-  if (HSECellNumber < 100) {
-    HSECellNumber = 100;
-  }
 
-  if (MyProcessorNumber == ROOT_PROCESSOR && debug) 
+  if (CloudWindUnbound == FALSE) {
+
+    for (dim = 0; dim < GridRank; dim++) {
+      if (HSECellNumber < GridDimension[dim]) {
+	HSECellNumber = GridDimension[dim];
+      }      
+    }           
+    if (HSECellNumber < 100) {
+      HSECellNumber = 100;
+    }
+    
+    if (MyProcessorNumber == ROOT_PROCESSOR && debug) 
       cout << "HSECellNumber = " << HSECellNumber << endl;
-
-  peos   = new float[HSECellNumber +1];
-  dens   = new float[HSECellNumber +1];
-  grav   = new float[HSECellNumber +1];
-  radius = new FLOAT[HSECellNumber +1];   
-
-  /* the next is the size of a HSE cell in code units. 
-     P...CoreRadius * 2 is a guess of the subcluster size, increase if necessary */ 
-  MappingUnit = PointSourceGravityCoreRadius * 2.0 / ( (float) HSECellNumber);
-
-  /* now fill the arrays with initial values. We have to assume that the filled values are
-     cell averaged quantities: it is not true, but just improve it if you don't like ;-) */
-
-  dens[0] = CloudWindCentralDensity;
-  /* the next one is the pressure, as calculated from the EoS */
-  peos[0] = CloudWindCentralDensity * CloudWindCentralTotalEnergy * (Gamma -1);
-  rad = 0.0;
-
-  //fprintf(stderr, "dens,pres %f %f\n", dens[0], peos[0]);
-
-  /* Write the file with the initial model */ 
-
-  if (MyProcessorNumber == ROOT_PROCESSOR) {
+    
+    peos   = new float[HSECellNumber +1];
+    dens   = new float[HSECellNumber +1];
+    grav   = new float[HSECellNumber +1];
+    radius = new FLOAT[HSECellNumber +1];   
+    
+    /* the next is the size of a HSE cell in code units. 
+       P...CoreRadius * 2 is a guess of the subcluster size, increase if necessary */ 
+    MappingUnit = PointSourceGravityCoreRadius * 2.0 / ( (float) HSECellNumber);
+    
+    /* now fill the arrays with initial values. We have to assume that the filled values are
+       cell averaged quantities: it is not true, but just improve it if you don't like ;-) */
+    
+    dens[0] = CloudWindCentralDensity;
+    /* the next one is the pressure, as calculated from the EoS */
+    peos[0] = CloudWindCentralDensity * CloudWindCentralTotalEnergy * (Gamma -1);
+    rad = 0.0;
+    
+    //fprintf(stderr, "dens,pres %f %f\n", dens[0], peos[0]);
+    
+    /* Write the file with the initial model */ 
+    
+    if (MyProcessorNumber == ROOT_PROCESSOR) {
       if (debug) cout << "Writing data to original_model.dat" << endl;
-
+      
       original_model = fopen("original_model.dat", "w");
       if (original_model == NULL)
-	  fprintf(stderr, "Cannot open %s\n", "original_model.dat");
+	fprintf(stderr, "Cannot open %s\n", "original_model.dat");
       
       fprintf(original_model, "Initial model\n");
       fprintf(original_model, "Radius\t\t Density\t Pressure\t\n" );
       fprintf(original_model, "%8f\t %8f\t %8f\t\n", rad, dens[0], peos[0]);
-  } 
-
-  for (ii = 1; ii <= HSECellNumber; ii++) {
+    } 
+    
+    for (ii = 1; ii <= HSECellNumber; ii++) {
       
-     rad += MappingUnit;     
-     dens[ii] = CloudWindCentralDensity * pow(1.0 + rad*rad/PointSourceGravityCoreRadius/
-						    PointSourceGravityCoreRadius, -3.0 * CloudWindBeta/2.0);
-     peos[ii] = dens[ii] * CloudWindCentralTotalEnergy * (Gamma -1);
-
-     if (MyProcessorNumber == ROOT_PROCESSOR) 
+      rad += MappingUnit;     
+      dens[ii] = CloudWindCentralDensity * pow(1.0 + rad*rad/PointSourceGravityCoreRadius/
+					       PointSourceGravityCoreRadius, -3.0 * CloudWindBeta/2.0);
+      peos[ii] = dens[ii] * CloudWindCentralTotalEnergy * (Gamma -1);
+      
+      if (MyProcessorNumber == ROOT_PROCESSOR) 
 	fprintf(original_model, "%8f\t %8f\t %8f\t\n", rad, dens[ii], peos[ii]); 
-
-     /* Find the gravitational acceleration. Sorry for the loss of generality, but 
-	a King profile is here assumed. */
-     rcubed = rad * rad * rad;
-     rcore = PointSourceGravityCoreRadius;
-     FLOAT x = rad / rcore;
-     rcubed /= (rcore*rcore*rcore * (-x / sqrt(1 + x*x)
-				     + log(x + sqrt(1 + x*x))));
-     
-     /* the DM central density is assumed to be 10 * gas-density */             
-     accel = PointSourceGravityConstant * (CloudWindCentralDensity * 10.0) / rcubed;
-     
-     grav[ii] = - accel * rad;
-
-     /* iterate the HSE procedure until the tolerance is reached, but for a finite time */
-
-     dens_zone = dens[ii];
-     pres_zone = peos[ii];
-
-     /* HSE iteration starts */
-
-     for (iter = 0; iter < max_iter; iter++) {      
-       /* Find the pressure that satisfies HSE at the interface between ii and ii-1 */
-       converge = false;
-       phse = peos[ii-1] + 0.5 * MappingUnit * grav[ii] * (dens_zone + dens[ii-1]);
-       /* Now we have a pressure difference between  phse and pres_zone: 
-	  compute the related density difference                         */ 
-       drho = (phse - pres_zone) / (pres_zone/dens_zone - 0.5 * MappingUnit * grav[ii]);
-       dens_zone += drho;
       
-       /* Check convergence or exit */
-
-       if (fabs(drho) < CloudWindHSETolerance * dens_zone){
-	 iter = max_iter;
-	 converge = true;     
-       }
-       
-     }
+      /* Find the gravitational acceleration. Sorry for the loss of generality, but 
+	 a King profile is here assumed. */
+      rcubed = rad * rad * rad;
+      rcore = PointSourceGravityCoreRadius;
+      FLOAT x = rad / rcore;
+      rcubed /= (rcore*rcore*rcore * (-x / sqrt(1 + x*x)
+				      + log(x + sqrt(1 + x*x))));
      
-     if (converge==false) {
-       fprintf(stderr, "The HSE iteration does not converge in zone %d\n", ii);
-       if (MyProcessorNumber == ROOT_PROCESSOR) fclose(original_model);
-       return FAIL;
-     }
+      /* the DM central density is assumed to be 10 * gas-density */             
+      accel = PointSourceGravityConstant * (CloudWindCentralDensity * 10.0) / rcubed;
+      
+      grav[ii] = - accel * rad;
+      
+      /* iterate the HSE procedure until the tolerance is reached, but for a finite time */
+      
+      dens_zone = dens[ii];
+      pres_zone = peos[ii];
+      
+      /* HSE iteration starts */
+      
+      for (iter = 0; iter < max_iter; iter++) {      
+	/* Find the pressure that satisfies HSE at the interface between ii and ii-1 */
+	converge = false;
+	phse = peos[ii-1] + 0.5 * MappingUnit * grav[ii] * (dens_zone + dens[ii-1]);
+	/* Now we have a pressure difference between  phse and pres_zone: 
+	   compute the related density difference                         */ 
+	drho = (phse - pres_zone) / (pres_zone/dens_zone - 0.5 * MappingUnit * grav[ii]);
+	dens_zone += drho;
+	
+	/* Check convergence or exit */
+	
+	if (fabs(drho) < CloudWindHSETolerance * dens_zone){
+	  iter = max_iter;
+	  converge = true;     
+	}	
+      }
      
-     dens[ii] = dens_zone;
-     peos[ii] = dens[ii] * CloudWindCentralTotalEnergy * (Gamma -1);         
-  }
-  
-  if (MyProcessorNumber == ROOT_PROCESSOR) fclose(original_model);
+      if (converge==false) {
+	fprintf(stderr, "The HSE iteration does not converge in zone %d\n", ii);
+	if (MyProcessorNumber == ROOT_PROCESSOR) fclose(original_model);
+	return FAIL;
+      }
+      
+      dens[ii] = dens_zone;
+      peos[ii] = dens[ii] * CloudWindCentralTotalEnergy * (Gamma -1);         
+    }
+    
+    if (MyProcessorNumber == ROOT_PROCESSOR) fclose(original_model);
 
-  /* Print the results of the HSE procedure on a file */
+    /* Print the results of the HSE procedure on a file */
 
-  if (MyProcessorNumber == ROOT_PROCESSOR) {
+    if (MyProcessorNumber == ROOT_PROCESSOR) {
       if (debug) cout << "Writing data to hse_model.dat" << endl;
-
+      
       hse_model = fopen("hse_model.dat", "w");
       if (hse_model == NULL)
-	  fprintf(stderr, "Cannot open %s\n", "hse_model.dat");
+	fprintf(stderr, "Cannot open %s\n", "hse_model.dat");
       
       fprintf(hse_model, "Model in HSE\n");
       fprintf(hse_model, "Radius\t\t Density\t Pressure\t\n" ); 
-  }
-
-  for (ii = 0; ii <= HSECellNumber; ii++) {
-     
-    rad = (FLOAT) ii * MappingUnit;
-    radius[ii] = rad;
-    if (MyProcessorNumber == ROOT_PROCESSOR)
-	fprintf(hse_model, "%8f\t %8f\t %8f\t\n", rad, dens[ii], peos[ii]);
+    }
     
-  }
+    for (ii = 0; ii <= HSECellNumber; ii++) {     
+      rad = (FLOAT) ii * MappingUnit;
+      radius[ii] = rad;
+      if (MyProcessorNumber == ROOT_PROCESSOR)
+	fprintf(hse_model, "%8f\t %8f\t %8f\t\n", rad, dens[ii], peos[ii]);
+      
+    }
+    
+    if (MyProcessorNumber == ROOT_PROCESSOR) fclose(hse_model);
 
-  if (MyProcessorNumber == ROOT_PROCESSOR) fclose(hse_model);
-
- } // if CloudWindUnbound == 0
-/* HSE part ends
+  } /* HSE part ends */
 
   /* Here is the part for filling the cells */
 
@@ -251,20 +250,28 @@ int grid::CloudWindInitializeGrid(float CloudWindVelocity,
 
   for (field = 0; field < NumberOfBaryonFields; field++)
     BaryonField[field] = new float[size];
+	
+  // minimum density of cloud interior given by pressure equilibrium
+  float dens_min = CloudWindExternalTotalEnergy * CloudWindExternalDensity / CloudWindCentralTotalEnergy;
 
-  if (debug) cout << "Filling cells..." << endl;  
-  
-  /* set density, total energy and velocity in problem dimension */
+  if (debug && CloudWindUnbound == FALSE)
+    cout << "Minium density = " << dens_min << endl;
+
+  if (debug) 
+    cout << "Filling cells in cloud..." << endl;  
+
+  /* Set density, total energy and velocity in problem dimension */
   
   for (k = 0; k < GridDimension[2]; k++)
     for (j = 0; j < GridDimension[1]; j++)
       for (i = 0; i < GridDimension[0]; i++) {
-	
-	/* calculate radial coordinate of cell */
+	index = k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i;
+
+	/* Calculate radial coordinate of cell */
 	
 	FLOAT xpos = CellLeftEdge[0][i] + 0.5*CellWidth[0][i] - PointSourceGravityPosition[0];
 	FLOAT ypos = CellLeftEdge[1][j] + 0.5*CellWidth[1][j] - PointSourceGravityPosition[1];
-	if (GridRank != 2){
+	if (GridRank != 2) {
 	  FLOAT zpos = CellLeftEdge[2][k] + 0.5*CellWidth[2][k] - PointSourceGravityPosition[2];
 	  r = sqrt((FLOAT) xpos*xpos + ypos*ypos + zpos*zpos);
 	}
@@ -272,112 +279,75 @@ int grid::CloudWindInitializeGrid(float CloudWindVelocity,
 	  r = sqrt((FLOAT) xpos*xpos + ypos*ypos);
 	}
 
-        if (CloudWindUnbound == 0) {
-
-	  /* Make a linear interpolation to r from the HSE model.
-	     Be careful: the cell can be outside the cluster, but your initial model must arrive at central distances
-	     well outside the cluster, too. In this way, if you write nonsense in dens_map, the next condition on 
-	     pressures puts you on the safe side  */
+	/* Make a linear interpolation to r from the HSE model.
+	   Be careful: the cell can be outside the cluster, but your initial model must arrive at central distances
+	   well outside the cluster, too. In this way, if you write nonsense in dens_intpl, the next condition on 
+	   pressures puts you on the safe side  */
 	
+	if (CloudWindUnbound == FALSE) {
 	  ii = 0;
-	  while(radius[ii] < r && ii <= HSECellNumber) {
-	    ii++; 
-	  }
+	  while(radius[ii] < r && ii <= HSECellNumber)
+	    ii++;
 	
-	  dens_map =(ii > HSECellNumber? 0.01 : dens[ii-1] * (radius[ii] - r) / (radius[ii] - radius[ii-1]) + 
-		     dens[ii] * (r - radius[ii-1]) / (radius[ii] - radius[ii-1]));
+	  dens_intpl = (ii > HSECellNumber ? dens_min : 
+			(dens[ii-1] * (radius[ii] - r) + dens[ii] * (r - radius[ii-1])) / (radius[ii] - radius[ii-1]));
+	} else {
+	  dens_intpl = dens_min;
+	}
 	
-	  /* Fill the cells, distinguishing between cluster and background 
-	     by comparing the cell pressure with the external pressure     */
+	/* Fill the cells, distinguishing between cluster and background */
 	
-	  if (dens_map > (CloudWindExternalTotalEnergy * CloudWindExternalDensity / 
-			  CloudWindCentralTotalEnergy)) {
-	    // the interface between the subcluster and the external medium is set by pressure equilibrium
-	    BaryonField[0][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = dens_map;
-	    BaryonField[1][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-	      CloudWindCentralTotalEnergy;
-	    BaryonField[VelNum][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 0.0;
-	    BaryonField[VelNum+1][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 0.0;
-	    if (GridRank != 2)
-	      BaryonField[VelNum+2][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 0.0;
-	    if (DualEnergyFormalism){
-	      BaryonField[DualNum][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-		CloudWindCentralTotalEnergy;
-	    }	   
-	  }
-	  else {
-	    BaryonField[0][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-	      CloudWindExternalDensity;
-	    
-	    BaryonField[1][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-	      CloudWindExternalTotalEnergy;
-	  
-	    BaryonField[1][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] += 
-	      0.5 * CloudWindVelocity * CloudWindVelocity;
+	// interface between the interior and the external medium is set by pressure equilibrium
+	if (CloudWindUnbound == FALSE && dens_intpl > dens_min) 
+	{
+	    BaryonField[0][index] = dens_intpl;
 
-	    BaryonField[VelNum][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-	      CloudWindVelocity;
+	    BaryonField[1][index] = CloudWindCentralTotalEnergy;
+	    if (DualEnergyFormalism)
+	      BaryonField[DualNum][index] = CloudWindCentralTotalEnergy;
 
-	    BaryonField[VelNum+1][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 0.0;
-	    if (GridRank != 2)
-	      BaryonField[VelNum+2][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 0.0;
-	    if (DualEnergyFormalism){
-	      BaryonField[DualNum][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-		CloudWindExternalTotalEnergy;
-	    }
-	  }
-	} // end CloudWindUnbound == 0 
-	else { // CloudWindUnbound == 1
+	    BaryonField[VelNum][index] = 0.0;
 
-	  /* Fill the cells, distinguishing between cloud and background */
+	    if (CloudWindUseMetallicityField)
+	      BaryonField[MetalNum][index] = CloudWindMetallicity*dens_intpl;
+	}
+	// cutoff radius
+	else if (CloudWindUnbound == TRUE && r < CloudWindCutoffRadius)
+	{
+	    BaryonField[0][index] = CloudWindCentralDensity;
 
-	  if (r < CloudWindCutoffRadius) {    //cutoff radius
-	    
-	    BaryonField[0][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-	      CloudWindCentralDensity;
-	    BaryonField[1][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-	      CloudWindExternalDensity * CloudWindExternalTotalEnergy / CloudWindCentralDensity; 
-	    /* the previous relation sets the thermal energy in the cloud by pressure equilibrium */
-	    BaryonField[VelNum][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 0.0;
-	    BaryonField[VelNum+1][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 0.0;
-	    if (GridRank != 2)
-	      BaryonField[VelNum+2][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 0.0;
-	    if (DualEnergyFormalism){
-	      BaryonField[DualNum][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-		CloudWindExternalDensity * CloudWindExternalTotalEnergy / CloudWindCentralDensity;
-	    }	   
-	  }
-	  else {
-	    BaryonField[0][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-	      CloudWindExternalDensity;
-	    
-	    BaryonField[1][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-	      CloudWindExternalTotalEnergy;
-	    
-	    BaryonField[1][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] += 
-	      0.5 * CloudWindVelocity * CloudWindVelocity;
-	    
-	    BaryonField[VelNum][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-	      CloudWindVelocity;
-	    
-	    BaryonField[VelNum+1][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 0.0;
-	    if (GridRank != 2)
-	      BaryonField[VelNum+2][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 0.0;
-	    if (DualEnergyFormalism){
-	      BaryonField[DualNum][k*GridDimension[0]*GridDimension[1] + j*GridDimension[0] + i] = 
-		CloudWindExternalTotalEnergy;
-	    }
-	  }
-	}  
+	    BaryonField[1][index] = CloudWindExternalDensity * CloudWindExternalTotalEnergy / CloudWindCentralDensity; 
+	    if (DualEnergyFormalism)
+	      BaryonField[DualNum][index] = CloudWindExternalDensity * CloudWindExternalTotalEnergy / CloudWindCentralDensity;
+
+	    BaryonField[VelNum][index] = 0.0;
+
+	    if (CloudWindUseMetallicityField)
+	      BaryonField[MetalNum][index] = CloudWindMetallicity*CloudWindCentralDensity;
+	}
+        // external medium (wind)
+	else 
+	{
+	    BaryonField[0][index] = CloudWindExternalDensity;
+
+	    BaryonField[1][index] = 
+	      CloudWindExternalTotalEnergy + 0.5 * CloudWindVelocity * CloudWindVelocity;
+	    if (DualEnergyFormalism)
+	      BaryonField[DualNum][index] = CloudWindExternalTotalEnergy;
+
+	    BaryonField[VelNum][index] = CloudWindVelocity;
+
+	    if (CloudWindUseMetallicityField)
+	      BaryonField[MetalNum][index] = 1.0e-12*CloudWindExternalDensity;
+	}
+
+	BaryonField[VelNum+1][index] = 0.0;
+	if (GridRank != 2)
+	  BaryonField[VelNum+2][index] = 0.0;
       }
 
-  /* set SGS fields */
-  
   /* TODO
   if (SGSModel) { 
-    if (debug) cout << "Initializing field " << SGSENum << endl;
-    for (int i = 0; i < size; i++)
-          BaryonField[SGSENum][i] = InitialSGSTurbEnergy;
     if (ShearImproved) {
       if (debug) cout << "Initializing fields " << AveMomt1Num << " " << AveMomt2Num << " " << AveMomt3Num << endl;
       for (int i = 0; i < size; i++) {
@@ -389,7 +359,7 @@ int grid::CloudWindInitializeGrid(float CloudWindVelocity,
   }
   */
 
-  if (CloudWindUnbound == 0) {
+  if (CloudWindUnbound == FALSE) {
    delete  peos;
    delete  dens;
    delete  grav;
