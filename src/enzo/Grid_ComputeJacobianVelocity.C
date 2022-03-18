@@ -348,6 +348,78 @@ int grid::ComputeJacobianVelocity(int weighing)
 }
 
 /**
+ * Computes the subgrid-scale energy in the nonlinear structural model
+ * from the square of the norm of the Jacobian of the velocity field
+ *
+ * @return returns SUCCESS or FAIL
+ */
+
+int grid::ComputeNonLinearSGSEnergy(float* SGSEnergy)
+{
+	if (ProcessorNumber != MyProcessorNumber)
+	{
+		return SUCCESS;
+	}
+	
+	if(debug) cout << "[" << MyProcessorNumber << "]" << " Computing nonlinear SGS energy" << endl;
+
+	int size = 1;
+	for (int dim = 0; dim < GridRank; dim++)
+	    size *= GridDimension[dim];
+
+	/// compute expansion factor and comoving cellwidth at the current problem time.
+
+	float a = 1.0, dadt = 0.0;
+  	float CoCellWidth[MAX_DIMENSION];
+
+	if (ComovingCoordinates)
+	{
+		
+		//
+		// for Time=0 the function CosmologyComputeExpansionFactor 
+		// doesn't give resonable results for a and dadt
+		//
+		if(Time>tiny_number)
+		{
+			if (CosmologyComputeExpansionFactor(Time, &a, &dadt) == FAIL)
+			{
+				fprintf(stderr, "Error in CosmologyComputeExpansionFactors.\n");
+			}
+		}
+
+		for (int i = 0; i < GridRank; ++i)
+		{
+			CoCellWidth[i] = a*CellWidth[i][0];
+		}
+			
+	}
+	else
+	{
+		for (int i = 0; i < GridRank; ++i)
+		{
+			CoCellWidth[i] = CellWidth[i][0];
+		}
+			
+	}
+
+	// the combined prefactor
+	float CDeltaSqr = 0.5/12. * SGScoeffNLu * POW(CoCellWidth[0]*CoCellWidth[1]*CoCellWidth[2],2./3.);
+
+	if (this->ComputeJacobianVelocityNormSqr(SGSEnergy) == FAIL)
+	{
+	    fprintf(stderr, "Error in grid->ComputeJacobianVelocityNormSqr.\n");
+	    return FAIL;
+	}
+	
+	for(int i=0;i<size;++i)
+	{
+	    SGSEnergy[i] *= CDeltaSqr;
+	}
+
+	return SUCCESS;
+}
+
+/**
  * Computes the square of the norm of the Jacobian of the velocity field
  *
  * @return returns SUCCESS or FAIL
@@ -712,4 +784,3 @@ int grid::ComputeDivergence(float* Div)
 	}
 	return SUCCESS;
 }
-

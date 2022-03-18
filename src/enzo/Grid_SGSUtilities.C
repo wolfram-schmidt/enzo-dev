@@ -154,9 +154,6 @@ int grid::SGSUtil_ComputeJacobian(float *Jac[][MAX_DIMENSION],float *field1,floa
         EndIndex[dim] = GridEndIndex[dim] + 1;
     }
 
-    if(debug) cout << "[" << MyProcessorNumber << "] " << " size = " << size << ", "
-		   << StartIndex[0] << ", " << GridStartIndex[0] << ", "  << GridEndIndex[0] << ", " << EndIndex[0] << endl;
-
     for (int m = 0; m < MAX_DIMENSION; m++) 
         for (int n = 0; n < MAX_DIMENSION; n++) {
             if (Jac[m][n] == NULL) {
@@ -166,16 +163,12 @@ int grid::SGSUtil_ComputeJacobian(float *Jac[][MAX_DIMENSION],float *field1,floa
             }
         }
 
-    if(debug) cout << "[" << MyProcessorNumber << "] " << " JacVel allocated" << endl;
-
     int igrid, ip1, im1, jp1, jm1, kp1, km1;
     float facX = 1. / (2. * CellWidth[0][0]);
     float facY = 1. / (2. * CellWidth[1][0]);
     float facZ = 1. / (2. * CellWidth[2][0]);
 
-    for (int k = StartIndex[2]; k <= EndIndex[2]; k++) {
-      if(debug) cout << "[" << MyProcessorNumber << "] " << " JacVel, k = " << k << endl;
-
+    for (int k = StartIndex[2]; k <= EndIndex[2]; k++)
         for (int j = StartIndex[1]; j <= EndIndex[1]; j++)
             for (int i = StartIndex[0]; i <= EndIndex[0]; i++) {
 
@@ -209,7 +202,6 @@ int grid::SGSUtil_ComputeJacobian(float *Jac[][MAX_DIMENSION],float *field1,floa
                 Jac[SGSZ][SGSZ][igrid] = (field3[kp1] - field3[km1]) * facZ;
 
             }
-    }
 
     return SUCCESS;
 }

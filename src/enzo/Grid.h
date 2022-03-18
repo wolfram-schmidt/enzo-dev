@@ -2650,9 +2650,10 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
 
     // Member functions defined in Grid_ComputeJacobianVelocity.C
 
-    int ComputeJacobianVelocity(int weighing);                                                                                                                       
-    int ComputeJacobianVelocityNormSqr(float* JacVelNormSqr);                                                                                                                         
-    int ComputeNonLinearScalar(float* NonLinScalar);                                                                                                                                  
+    int ComputeJacobianVelocity(int weighing);
+    int ComputeJacobianVelocityNormSqr(float* JacVelNormSqr);
+    int ComputeNonLinearSGSEnergy(float* SGSEnergy);
+    int ComputeNonLinearScalar(float* NonLinScalar);
     int ComputeRateOfStrainNormSqr(float* STNormSqr, int tracefree);
     int ComputeVorticityNormSqr(float* VortNormSqr);
     int ComputeDivergence(float* Div);
