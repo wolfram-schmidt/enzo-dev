@@ -442,6 +442,7 @@ int SetDefaultGlobalValues(TopGridData &MetaData)
   }
 
   UseSGSModel = 0; // off
+  UseSGSDiffusion = 0; // off
   SGSEnergies = 0; // compute and output energy variables
   SGSFilterStencil = 0; // the one-dimensional stencil of the complete filter 
   SGSNeedJacobians = 0; // set automatically in ReadParameter file 
@@ -457,6 +458,7 @@ int SetDefaultGlobalValues(TopGridData &MetaData)
   SGScoeffNLu = 0.0; // off
   SGScoeffNLuNormedEnS2Star = 0.0; // off
   SGScoeffNLb = 0.0; // off
+  SGScoeffNLe = 0.0; // off
 
   RadiativeCooling            = FALSE;             // off
   RadiativeCoolingModel       = 1;                 //1=cool_rates.in table lookup

@@ -58,6 +58,7 @@ grid::~grid()
     delete [] RandomForcingField[i];
     if (PhaseFctMultEven[i] != NULL) delete[] PhaseFctMultEven[i];
     if (PhaseFctMultOdd[i] != NULL) delete[] PhaseFctMultOdd[i];
+    if (GradEint[i] != NULL) delete[] GradEint[i];
   }
  
   if (PhaseFctInitEven != NULL) delete[] PhaseFctInitEven;
@@ -99,6 +100,8 @@ grid::~grid()
         delete [] FltUB[i];
       FltUB[i] = NULL;
     }
+
+    if (AuxField != NULL) delete[] AuxField;
   }
 
   for (i = 0; i < MAX_DIMENSION*MAX_DIMENSION; i++) { /// WS

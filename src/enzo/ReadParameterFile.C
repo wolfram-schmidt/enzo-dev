@@ -590,6 +590,7 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
                      DrivenFlowAutoCorrl, DrivenFlowAutoCorrl+1, DrivenFlowAutoCorrl+2);
 
     ret += sscanf(line, "UseSGSModel = %"ISYM, &UseSGSModel);
+    ret += sscanf(line, "UseSGSDiffusion = %"ISYM, &UseSGSDiffusion);
     ret += sscanf(line, "SGSEnergies = %"ISYM, &SGSEnergies);
     ret += sscanf(line, "SGSFilterStencil = %"ISYM, &SGSFilterStencil);
     ret += sscanf(line, "SGSFilterWidth = %"FSYM, &SGSFilterWidth);
@@ -602,6 +603,7 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
     ret += sscanf(line, "SGScoeffNLu = %"FSYM, &SGScoeffNLu);
     ret += sscanf(line, "SGScoeffNLuNormedEnS2Star = %"FSYM, &SGScoeffNLuNormedEnS2Star);
     ret += sscanf(line, "SGScoeffNLb =%"FSYM, &SGScoeffNLb);
+    ret += sscanf(line, "SGScoeffNLe =%"FSYM, &SGScoeffNLe);
     ret += sscanf(line, "SGScoeffSSu = %"FSYM, &SGScoeffSSu);
     ret += sscanf(line, "SGScoeffSSb =%"FSYM, &SGScoeffSSb);
     ret += sscanf(line, "SGScoeffSSemf = %"FSYM, &SGScoeffSSemf);
@@ -1525,7 +1527,8 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
       SGScoeffNLemfCompr != 0. ||
       SGScoeffNLu != 0. ||
       SGScoeffNLuNormedEnS2Star != 0. ||
-      SGScoeffNLb != 0.)
+      SGScoeffNLb != 0. ||
+      SGScoeffNLe != 0. )
 
       SGSNeedJacobians = 1;
 

@@ -66,6 +66,7 @@ grid::grid()
     RandomForcingField[i]            = NULL;
     PhaseFctMultEven[i]              = NULL; // WS
     PhaseFctMultOdd[i]               = NULL; // WS
+    GradEint[i]                      = NULL;
   }
   PhaseFctInitEven = NULL; // WS
   PhaseFctInitOdd  = NULL; // WS
@@ -86,6 +87,8 @@ grid::grid()
     }
     for (i = 0; i < 3; i++) 
       FltUB[i] = NULL;
+
+    AuxField = NULL;
   }
 
   for (i = 0; i < MAX_DIMENSION*MAX_DIMENSION; i++) { // WS

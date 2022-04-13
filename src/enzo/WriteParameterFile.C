@@ -531,6 +531,7 @@ int WriteParameterFile(FILE *fptr, TopGridData &MetaData, char *name = NULL)
   if (DrivenFlowProfile)
     Forcing.WriteParameters(fptr);
   fprintf(fptr, "UseSGSModel                    = %"ISYM"\n", UseSGSModel);
+  fprintf(fptr, "UseSGSDiffusion                = %"ISYM"\n", UseSGSDiffusion);
   fprintf(fptr, "SGSEnergies                    = %"ISYM"\n", SGSEnergies);
   fprintf(fptr, "SGSFilterWidth                 = %"FSYM"\n", SGSFilterWidth);
   fprintf(fptr, "SGSFilterStencil               = %"ISYM"\n", SGSFilterStencil);
@@ -543,6 +544,7 @@ int WriteParameterFile(FILE *fptr, TopGridData &MetaData, char *name = NULL)
   fprintf(fptr, "SGScoeffNLu                    = %"FSYM"\n", SGScoeffNLu);
   fprintf(fptr, "SGScoeffNLuNormedEnS2Star      = %"FSYM"\n", SGScoeffNLuNormedEnS2Star);
   fprintf(fptr, "SGScoeffNLb                    = %"FSYM"\n", SGScoeffNLb);
+  fprintf(fptr, "SGScoeffNLe                    = %"FSYM"\n", SGScoeffNLe);
   fprintf(fptr, "use_grackle                 = %"ISYM"\n", use_grackle);
   fprintf(fptr, "RadiativeCooling               = %"ISYM"\n", RadiativeCooling);
   fprintf(fptr, "RadiativeCoolingModel          = %"ISYM"\n", RadiativeCoolingModel);

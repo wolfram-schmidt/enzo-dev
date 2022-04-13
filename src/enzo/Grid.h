@@ -2546,22 +2546,30 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
     float *JacVel[MAX_DIMENSION][MAX_DIMENSION];
     float *JacB[MAX_DIMENSION][MAX_DIMENSION];
 
+    // Gradients to be used in SGS model
+    float *GradEint[MAX_DIMENSION];
+
     float *FilteredFields[7]; // filtered fields: rho, xyz-vel, Bxyz
-    
+    float *AuxField; // auxiliary field    
+
     // the scale-similarity model needs mixed filtered quantities
     float *FltrhoUU[6];
     float *FltBB[6];
     float *FltUB[3];
 
+    int SGSUtil_ComputeGradient(float *Grad[MAX_DIMENSION],float *field); 
     int SGSUtil_ComputeJacobian(float *Jac[][MAX_DIMENSION],float* field1,float* field2,float* field3);
     int SGSUtil_ComputeMixedFilteredQuantities();
     int SGSUtil_FilterFields();
+    int SGSUtil_InternalEnergy();
     
     // the general functions that add the SGS terms to the dynamic eqns.
+    int SGS_AddDiffusionTerms(float **dU);
     int SGS_AddEMFTerms(float **dU);
     int SGS_AddMomentumTerms(float **dU);
     
     // the different SGS models
+    void SGS_AddDiff_nonlinear_energy(float **Flux);
     void SGS_AddEMF_eddy_resistivity(float **EMF);
     void SGS_AddEMF_nonlinear_compressive(float **EMF);
     void SGS_AddMom_nonlinear_kinetic(float **Tau);

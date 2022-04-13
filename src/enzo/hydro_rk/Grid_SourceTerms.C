@@ -295,11 +295,39 @@ int grid::SourceTerms(float **dU, float min_coeff)
         fprintf(stderr, "grid::SourceTerms: Error in SGSUtil_ComputeJacobian(Vel).\n");
         return FAIL;
       }
+
+      if (UseSGSDiffusion) {
+	// compute internal energy if needed
+	if (this->SGSUtil_InternalEnergy() == FAIL) {
+	  fprintf(stderr, "grid::SourceTerms: Error in SGSUtil_InternalEnergy.\n");
+	  return FAIL;
+	}
+
+        // internal energy gradient
+        if (DualEnergyFormalism) {
+	  if (this->SGSUtil_ComputeGradient(GradEint,BaryonField[GENum]) == FAIL) {
+	    fprintf(stderr, "grid::SourceTerms: Error in SGSUtil_ComputeGradient(Eint)).\n");
+	    return FAIL;
+	  }
+	} else {
+	  if (this->SGSUtil_ComputeGradient(GradEint,AuxField) == FAIL) {
+	    fprintf(stderr, "grid::SourceTerms: Error in SGSUtil_ComputeGradient(Eint)).\n");
+	    return FAIL;
+	  }
+	}
+      }
     }
 
     if (this->SGS_AddMomentumTerms(dU) == FAIL) {
       fprintf(stderr, "grid::SourceTerms: Error in SGS_AddMomentumTerms(dU).\n");
       return FAIL;
+    }
+
+    if (UseSGSDiffusion) {
+      if (this->SGS_AddDiffusionTerms(dU) == FAIL) {
+	fprintf(stderr, "grid::SourceTerms: Error in SGS_AddDiffusionTerms(dU).\n");
+	return FAIL;
+      }
     }
   }
   

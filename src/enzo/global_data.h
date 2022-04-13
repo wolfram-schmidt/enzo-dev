@@ -394,6 +394,7 @@ EXTERN float DrivenFlowDomainLength[MAX_DIMENSION];
 
 /* Subgrid-scale model variables */
 EXTERN int UseSGSModel;
+EXTERN int UseSGSDiffusion;
 EXTERN int SGSEnergies;
 EXTERN int SGSFilterStencil;
 EXTERN int SGSNeedJacobians;
@@ -407,6 +408,7 @@ EXTERN float SGScoeffNLemfCompr;
 EXTERN float SGScoeffNLu;
 EXTERN float SGScoeffNLuNormedEnS2Star;
 EXTERN float SGScoeffNLb;
+EXTERN float SGScoeffNLe;
 EXTERN float SGScoeffSSu;
 EXTERN float SGScoeffSSb;
 EXTERN float SGScoeffSSemf;
