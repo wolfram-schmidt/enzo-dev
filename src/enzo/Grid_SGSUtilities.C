@@ -176,8 +176,8 @@ int grid::SGSUtil_InternalEnergy() {
 
     if (AuxField == NULL) {
         AuxField = new float[size];
-        for (int i = 0; i < size; i++)
-	    AuxField[i] = 0.;
+	for (int i = 0; i < size; i++)
+	  AuxField[i] = 0.;
     }
 
     int igrid;

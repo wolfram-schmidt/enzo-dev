@@ -459,6 +459,7 @@ int SetDefaultGlobalValues(TopGridData &MetaData)
   SGScoeffNLuNormedEnS2Star = 0.0; // off
   SGScoeffNLb = 0.0; // off
   SGScoeffNLe = 0.0; // off
+  SGScoeffNLm = 0.0; // off
 
   RadiativeCooling            = FALSE;             // off
   RadiativeCoolingModel       = 1;                 //1=cool_rates.in table lookup

@@ -315,6 +315,14 @@ int grid::SourceTerms(float **dU, float min_coeff)
 	    return FAIL;
 	  }
 	}
+
+	// species gradients
+	for (int ns = NEQ_HYDRO; ns < NEQ_HYDRO+NSpecies; ns++) {
+	  if (this->SGSUtil_ComputeGradient(GradSpec[ns-NEQ_HYDRO],BaryonField[ns]) == FAIL) {
+	    fprintf(stderr, "grid::SourceTerms: Error in SGSUtil_ComputeGradient(Spec)).\n");
+	    return FAIL;
+	  }
+	}
       }
     }
 

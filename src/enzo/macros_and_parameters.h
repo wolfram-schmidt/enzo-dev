@@ -110,6 +110,8 @@
 
 #define NUMBER_ENZO_PARTICLE_TYPES           3  /* Dark Matter, Stars, Active Particles */
 
+#define MAX_SPECIES                        12
+
 /* Unmodifiable Parameters */
 
 #define MAX_DIMENSION                       3  /* must be 3! */

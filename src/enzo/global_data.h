@@ -409,6 +409,7 @@ EXTERN float SGScoeffNLu;
 EXTERN float SGScoeffNLuNormedEnS2Star;
 EXTERN float SGScoeffNLb;
 EXTERN float SGScoeffNLe;
+EXTERN float SGScoeffNLm;
 EXTERN float SGScoeffSSu;
 EXTERN float SGScoeffSSb;
 EXTERN float SGScoeffSSemf;

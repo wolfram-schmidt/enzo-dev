@@ -604,6 +604,7 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
     ret += sscanf(line, "SGScoeffNLuNormedEnS2Star = %"FSYM, &SGScoeffNLuNormedEnS2Star);
     ret += sscanf(line, "SGScoeffNLb =%"FSYM, &SGScoeffNLb);
     ret += sscanf(line, "SGScoeffNLe =%"FSYM, &SGScoeffNLe);
+    ret += sscanf(line, "SGScoeffNLm =%"FSYM, &SGScoeffNLm);
     ret += sscanf(line, "SGScoeffSSu = %"FSYM, &SGScoeffSSu);
     ret += sscanf(line, "SGScoeffSSb =%"FSYM, &SGScoeffSSb);
     ret += sscanf(line, "SGScoeffSSemf = %"FSYM, &SGScoeffSSemf);

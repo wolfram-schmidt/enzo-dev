@@ -78,6 +78,11 @@ grid::grid()
         JacB[i][j] = NULL;
       }
 
+    for (i = 0; i < MAX_SPECIES; i++) 
+      for (j = 0; j < MAX_DIMENSION; j++) {
+        GradSpec[i][j] = NULL;
+      }
+
     for (i = 0; i < 7; i++)
       FilteredFields[i] = NULL;
 

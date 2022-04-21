@@ -79,6 +79,15 @@ grid::~grid()
       }
     }
 
+    for (i = 0; i < MAX_SPECIES; i++) {
+      for (j = 0; j < MAX_DIMENSION; j++) {
+        if (GradSpec[i][j] != NULL) {
+          delete [] GradSpec[i][j];
+          GradSpec[i][j] = NULL;
+        }
+      }
+    }
+
     for (i = 0; i < 7; i++) {
       if (FilteredFields[i] != NULL)
         delete [] FilteredFields[i];

@@ -2548,6 +2548,7 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
 
     // Gradients to be used in SGS model
     float *GradEint[MAX_DIMENSION];
+    float *GradSpec[MAX_SPECIES][MAX_DIMENSION];
 
     float *FilteredFields[7]; // filtered fields: rho, xyz-vel, Bxyz
     float *AuxField; // auxiliary field    
@@ -2562,7 +2563,7 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
     int SGSUtil_ComputeMixedFilteredQuantities();
     int SGSUtil_FilterFields();
     int SGSUtil_InternalEnergy();
-    
+
     // the general functions that add the SGS terms to the dynamic eqns.
     int SGS_AddDiffusionTerms(float **dU);
     int SGS_AddEMFTerms(float **dU);
@@ -2570,6 +2571,7 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
     
     // the different SGS models
     void SGS_AddDiff_nonlinear_energy(float **Flux);
+    void SGS_AddDiff_nonlinear_species(float **Flux, int s);
     void SGS_AddEMF_eddy_resistivity(float **EMF);
     void SGS_AddEMF_nonlinear_compressive(float **EMF);
     void SGS_AddMom_nonlinear_kinetic(float **Tau);
