@@ -26,6 +26,7 @@
 #ifdef ECUDA
 #include "hydro_rk/CudaMHD.h"
 #endif
+#include "hydro_rk/EquilibriumGalaxyDisk.h"
 
 #include "TopGridData.h"
 
@@ -3129,6 +3130,48 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
   int PrepareAlfvenVelocityNormalization(double *v_rms, double *Volume);
   int NormalizeMagneticFields(Eflt factor);
 
+  int GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
+				   //EquilibriumGalaxyDisk DiskTable[MAX_SPHERES],
+		  		  float SphereRadius[MAX_SPHERES][MAX_DIMENSION],
+				  float SphereAngularMomentum[MAX_SPHERES][MAX_DIMENSION],
+				  float SphereCoreRadius[MAX_SPHERES][MAX_DIMENSION],
+				  float SphereDensity[MAX_SPHERES],
+				  float SphereTemperature[MAX_SPHERES],
+				  float SphereMetallicity[MAX_SPHERES],
+				  float SpherePosition[MAX_SPHERES][MAX_DIMENSION],
+				  float SphereVelocity[MAX_SPHERES][MAX_DIMENSION],
+				  float SphereFracKeplerianRot[MAX_SPHERES],
+				  float SphereTurbulence[MAX_SPHERES],
+				  float SphereDispersion[MAX_SPHERES], 
+				  float SphereCutOff[MAX_SPHERES],
+				  float SphereAng1[MAX_SPHERES],
+				  float SphereAng2[MAX_SPHERES],
+				  int   SphereNumShells[MAX_SPHERES],
+				  int   SphereType[MAX_SPHERES],
+				  int   SphereConstantPressure[MAX_SPHERES],
+				  int   SphereSmoothSurface[MAX_SPHERES],
+				  float SphereSmoothRadius[MAX_SPHERES],
+				  float SphereMagnFactor[MAX_SPHERES],
+				  int   SphereMagnEquipart[MAX_SPHERES],
+				  float HaloMass[MAX_SPHERES],
+				  float HaloCoreRadius[MAX_SPHERES],
+				  float HaloRadius[MAX_SPHERES],
+				  int   SphereUseParticles,
+				  float ParticleMeanDensity,
+				  float UniformVelocity[MAX_DIMENSION],
+				  int   SphereUseColour,
+				  int   SphereUseMetals,
+				  float InitialTemperature,
+				  float InitialDensity,
+				  float InitialMagnField,
+				  int   PressureGradientType[MAX_SPHERES],
+				  int   level,
+				  int   SetBaryonFields,
+				  int   partitioned,
+				  float TopGridSpacing,
+				  int maxlevel,
+				  int grid_traditional,
+				  float grid_safety_factor);
   int GalaxyDiskInitializeGrid(int NumberOfHalos,
 			       FLOAT HaloRadius[MAX_SPHERES],
 			       FLOAT HaloCoreRadius[MAX_SPHERES],
@@ -3157,6 +3200,7 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
 			    FLOAT DiskRadius,
 			    FLOAT DiskHeight, 
 			    int UseGas, int level);
+
   int MHDRK2_1stStep(fluxes *SubgridFluxes[], 
 		     int NumberOfSubgrids, int level,
 		     ExternalBoundary *Exterior);

@@ -229,6 +229,9 @@ int MHDTurbulenceInitialize(FILE *fptr, FILE *Outfptr,
 			    HierarchyEntry &TopGrid, TopGridData &MetaData, int SetBaryonFields);
 int MHDDecayingRandomFieldInitialize(FILE *fptr, FILE *Outfptr, 
 			    HierarchyEntry &TopGrid, TopGridData &MetaData, int SetBaryonFields);
+int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
+			     HierarchyEntry &TopGrid, TopGridData &MetaData,
+			     int SetBaryonFields);
 int GalaxyDiskInitialize(FILE *fptr, FILE *Outfptr, 
 			 HierarchyEntry &TopGrid, TopGridData &MetaData);
 int AGNDiskInitialize(FILE *fptr, FILE *Outfptr, 
@@ -669,6 +672,16 @@ int InitializeNew(char *filename, HierarchyEntry &TopGrid,
   /* 204) 3D MHD Test */
   if (ProblemType == 204) {
     ret = MHD3DTestInitialize(fptr, Outfptr, TopGrid, MetaData);
+  }
+
+ 
+  /* 206) Galaxy with Live Halo */
+  if (ProblemType == 206) {
+    if (ParallelRootGridIO == TRUE) {
+      ret = GalaxyLiveHaloInitialize(fptr, Outfptr, TopGrid, MetaData, 0);
+    } else {
+      ret = GalaxyLiveHaloInitialize(fptr, Outfptr, TopGrid, MetaData, 1);
+    }
   }
 
   /* 207) Galaxy Disk */

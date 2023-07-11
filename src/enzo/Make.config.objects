@@ -1149,8 +1149,10 @@ OBJS_HYDRO_RK = \
         hydro_rk/Collapse1DInitialize.o \
         hydro_rk/Collapse3DInitialize.o \
         hydro_rk/ComputeDednerWaveSpeeds.o \
+        hydro_rk/EquilibriumGalaxyDisk.o \
         hydro_rk/EvolveLevel_RK2.o \
         hydro_rk/GalaxyDiskInitialize.o \
+        hydro_rk/GalaxyLiveHaloInitialize.o \
         hydro_rk/Grid_AddSelfGravity.o \
         hydro_rk/Grid_AddViscosity.o \
         hydro_rk/Grid_AGNDiskInitializeGrid.o \
@@ -1158,6 +1160,7 @@ OBJS_HYDRO_RK = \
         hydro_rk/Grid_Collapse3DInitializeGrid.o \
         hydro_rk/Grid_CopyOldBaryonFieldToBaryonField.o \
         hydro_rk/Grid_GalaxyDiskInitializeGrid.o \
+        hydro_rk/Grid_GalaxyLiveHaloInitializeGrid.o \
         hydro_rk/Grid_Hydro3D.o \
 	hydro_rk/Grid_ReturnHydroRKPointers.o \
 	hydro_rk/Grid_ReturnOldHydroRKPointers.o \
@@ -1173,7 +1176,8 @@ OBJS_HYDRO_RK = \
 	hydro_rk/Grid_PrepareVelocityNormalization.o \
 	hydro_rk/Grid_PrepareAlfvenVelocityNormalization.o \
 	hydro_rk/Grid_NormalizeVelocities.o \
-	hydro_rk/Grid_NormalizeMagneticFields.o \
+        hydro_rk/Grid_NormalizeMagneticFields.o \
+        hydro_rk/HydrostaticDisk.o \
         hydro_rk/Turbulence_Generator.o \
         hydro_rk/HLL_PLM.o \
         hydro_rk/HLL_PPM.o \
