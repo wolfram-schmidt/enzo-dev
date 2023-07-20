@@ -22,6 +22,7 @@
 #include "Hierarchy.h"
 #include "LevelHierarchy.h"
 #include "TopGridData.h"
+#include "EquilibriumGalaxyDisk.h"
 
 void WriteListOfFloats(FILE *fptr, int N, float floats[]);
 void WriteListOfFloats(FILE *fptr, int N, FLOAT floats[]);
@@ -114,10 +115,12 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
   float MHDGalaxyDiskUniformVelocity[MAX_DIMENSION];
 
   float MHDGalaxyDiskPosition[MAX_SPHERES][MAX_DIMENSION], 
-        MHDGalaxyDiskRadius[MAX_SPHERES][MAX_DIMENSION],
+        MHDGalaxyDiskRadius[MAX_SPHERES],
         MHDGalaxyDiskCoreRadius[MAX_SPHERES][MAX_DIMENSION],
         MHDGalaxyDiskVelocity[MAX_SPHERES][MAX_DIMENSION],
         MHDGalaxyDiskAngularMomentum[MAX_SPHERES][MAX_DIMENSION];
+
+  EquilibriumGalaxyDisk DiskTable[MAX_SPHERES];
 
   for (sphere = 0; sphere < MAX_SPHERES; sphere++) {
     MHDGalaxyDiskPressureGradientType[sphere]   = 2; // S.C.S (08/2019)
@@ -137,12 +140,12 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
     MHDGalaxyDiskHaloCoreRadius[sphere]		= 0.2;
     MHDGalaxyDiskHaloRadius[sphere]			= 10.0;
     MHDGalaxyDiskHaloMass[sphere]			= 1.0e11;
+    MHDGalaxyDiskRadius[sphere]     = 10;
 
     for (dim = 0; dim < MAX_DIMENSION; dim++) {
       MHDGalaxyDiskPosition[sphere][dim] = 0.5*(DomainLeftEdge[dim] +
 						     DomainRightEdge[dim]);
       MHDGalaxyDiskVelocity[sphere][dim] = 0;
-    MHDGalaxyDiskRadius[sphere][dim]     = 5.0;
     MHDGalaxyDiskCoreRadius[sphere][dim] = 0.2;
 	MHDGalaxyDiskAngularMomentum[sphere][dim]=0.0;
     }
@@ -214,10 +217,8 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
                   &MHDGalaxyDiskCoreRadius[sphere][1], 
                   &MHDGalaxyDiskCoreRadius[sphere][2]);
     if (sscanf(line, "MHDGalaxyDiskRadius[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskRadius[%"ISYM"] = %"PSYM" %"PSYM" %"PSYM,
-                    &sphere, &MHDGalaxyDiskRadius[sphere][0],
-                    &MHDGalaxyDiskRadius[sphere][1],
-                    &MHDGalaxyDiskRadius[sphere][2]);
+      	ret += sscanf(line, "MHDGalaxyDiskRadius[%"ISYM"] = %"FSYM, &sphere,
+		    &MHDGalaxyDiskRadius[sphere]);
     if (sscanf(line, "MHDGalaxyDiskAngularMomentum[%"ISYM"]", &sphere) > 0)
       	ret += sscanf(line, "MHDGalaxyDiskAngularMomentum[%"ISYM"] = %"PSYM" %"PSYM" %"PSYM,
                     &sphere, &MHDGalaxyDiskAngularMomentum[sphere][0],
@@ -285,6 +286,9 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 
   } // end input from parameter file
 
+  for (sphere = 0; sphere < MHDGalaxyDiskNumberOfSpheres; sphere++)
+    DiskTable[sphere].ReadInData("disk-hernq.dat");
+
   /* set up grid */
 
   /* =========================================================================
@@ -299,39 +303,17 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
   while (CurrentGrid != NULL) {
   	if (CurrentGrid->GridData->GalaxyLiveHaloInitializeGrid(
 					MHDGalaxyDiskNumberOfSpheres,
-					MHDGalaxyDiskRadius,
+					DiskTable,
+					MHDGalaxyDiskPosition,
 					MHDGalaxyDiskAngularMomentum,
-					MHDGalaxyDiskCoreRadius,
-					MHDGalaxyDiskDensity,
+					MHDGalaxyDiskVelocity,
+					MHDGalaxyDiskRadius,
 					MHDGalaxyDiskTemperature,
 					MHDGalaxyDiskMetallicity,
-					MHDGalaxyDiskPosition,
-					MHDGalaxyDiskVelocity,
-					MHDGalaxyDiskFracKeplerianRot,
-					MHDGalaxyDiskTurbulence,
-					MHDGalaxyDiskDispersion,
-					MHDGalaxyDiskCutOff,
-					MHDGalaxyDiskAng1,
-					MHDGalaxyDiskAng2,
-					MHDGalaxyDiskNumShells,
-					MHDGalaxyDiskType,
-					MHDGalaxyDiskConstantPressure,
-					MHDGalaxyDiskSmoothSurface,
-					MHDGalaxyDiskSmoothRadius,
-					MHDGalaxyDiskMagnFactor,
-					MHDGalaxyDiskMagnEquipart,
-					MHDGalaxyDiskHaloMass,
-					MHDGalaxyDiskHaloCoreRadius,
-					MHDGalaxyDiskHaloRadius,
-					MHDGalaxyDiskUseParticles,
-					MHDGalaxyDiskParticleMeanDensity,
-					MHDGalaxyDiskUniformVelocity,
-					MHDGalaxyDiskUseColour,
-					MHDGalaxyDiskUseMetals,
 					MHDGalaxyDiskInitialTemperature,
 					MHDGalaxyDiskInitialDensity,
 					MHDGalaxyDiskInitialMagnField,
-		        		MHDGalaxyDiskPressureGradientType,	
+					MHDGalaxyDiskUseParticles,
 					0,
 					SetBaryonFields,
 					1,
@@ -384,39 +366,17 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 		  {
 			  if (Temp->GridData->GalaxyLiveHaloInitializeGrid(
 				MHDGalaxyDiskNumberOfSpheres,
-				MHDGalaxyDiskRadius,
+				DiskTable,
+				MHDGalaxyDiskPosition,
 				MHDGalaxyDiskAngularMomentum,
-				MHDGalaxyDiskCoreRadius,
-				MHDGalaxyDiskDensity,
+				MHDGalaxyDiskVelocity,
+				MHDGalaxyDiskRadius,
 				MHDGalaxyDiskTemperature,
 				MHDGalaxyDiskMetallicity,
-				MHDGalaxyDiskPosition,
-				MHDGalaxyDiskVelocity,
-				MHDGalaxyDiskFracKeplerianRot,
-				MHDGalaxyDiskTurbulence,
-				MHDGalaxyDiskDispersion,
-				MHDGalaxyDiskCutOff,
-				MHDGalaxyDiskAng1,
-				MHDGalaxyDiskAng2,
-				MHDGalaxyDiskNumShells,
-				MHDGalaxyDiskType,
-				MHDGalaxyDiskConstantPressure,
-				MHDGalaxyDiskSmoothSurface,
-				MHDGalaxyDiskSmoothRadius,
-				MHDGalaxyDiskMagnFactor,
-				MHDGalaxyDiskMagnEquipart,
-				MHDGalaxyDiskHaloMass,
-				MHDGalaxyDiskHaloCoreRadius,
-				MHDGalaxyDiskHaloRadius,
-				MHDGalaxyDiskUseParticles,
-				MHDGalaxyDiskParticleMeanDensity,
-				MHDGalaxyDiskUniformVelocity,
-				MHDGalaxyDiskUseColour,
-				MHDGalaxyDiskUseMetals,
 				MHDGalaxyDiskInitialTemperature,
 				MHDGalaxyDiskInitialDensity,
 				MHDGalaxyDiskInitialMagnField,
-				MHDGalaxyDiskPressureGradientType,
+				MHDGalaxyDiskUseParticles,
 				level,   // S. Selg (11/2019, used to be level+1)
 				SetBaryonFields,
 				0,
@@ -725,9 +685,8 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
     for (sphere = 0; sphere < MHDGalaxyDiskNumberOfSpheres; sphere++) {
       fprintf(Outfptr, "MHDGalaxyDiskType[%"ISYM"] = %"ISYM"\n", sphere,
 	      MHDGalaxyDiskType[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskRadius[%"ISYM"] = ", sphere);
-	WriteListOfFloats(Outfptr, MetaData.TopGridRank,
-                        MHDGalaxyDiskRadius[sphere]);
+      fprintf(Outfptr, "MHDGalaxyDiskRadius[%"ISYM"] = %"FSYM"\n", sphere,
+	      MHDGalaxyDiskRadius[sphere]);
       fprintf(Outfptr, "MHDGalaxyDiskAngularMomentum[%"ISYM"] = ", sphere);
       WriteListOfFloats(Outfptr, MetaData.TopGridRank,
                         MHDGalaxyDiskAngularMomentum[sphere]);
