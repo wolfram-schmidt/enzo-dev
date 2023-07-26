@@ -30,6 +30,7 @@
 #include "Grid.h"
 #include "CosmologyParameters.h"
 #include "EquilibriumGalaxyDisk.h"
+#include "HydrostaticDisk.h"
 
 #define NTHETA 1000
 #define NR 1000
@@ -76,6 +77,23 @@ static float CosmologySimulationInitialFractionHeIII = 1.0e-17;
 static float CosmologySimulationInitialFractionHM    = 2.0e-9;
 static float CosmologySimulationInitialFractionH2I   = 2.0e-20;
 static float CosmologySimulationInitialFractionH2II  = 3.0e-14;
+
+static int legacy = 0;
+
+// structure for legacy model test
+struct galaxy_parameters {
+  int N_x, N_z;
+  
+  // disk scales in cgs units
+  double r_s, z_s;
+  double dx, dz;
+  double sigma;
+  double v_s;
+
+  // halo scales in cgs units
+  double halo_mass, halo_scale;
+};
+
 
 int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 				       EquilibriumGalaxyDisk DiskTable[MAX_SPHERES],
@@ -375,38 +393,38 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 	
 	/* Loop over the mesh. */
 	
-	float SoundSpeed[MAX_SPHERES], r_max[MAX_SPHERES];
+	float r_max[MAX_SPHERES];
+	float SoundSpeed[MAX_SPHERES];
 	float SphereTransformMatrix[MAX_SPHERES][MAX_DIMENSION][MAX_DIMENSION];
 
-	/*
-	float density, dens1, old_density, Velocity[MAX_DIMENSION], MagnField[MAX_DIMENSION],
-		DiskVelocity[MAX_DIMENSION], temperature, temp1, sigma, sigma1, 
-		weight, DMVelocity[MAX_DIMENSION], 
-		outer_radius;
-	float r, rcyl, x, y = 0, z = 0;
-	int n = 0, ibin;
+	double poisson_coeff = 4*pi*GravConst; // cgs units
+
+	/* legacy method */
+	hydrostatic_disk Galaxy[MAX_SPHERES];
 	
-	
-	double SphereRotationalPeriod[MAX_SPHERES];
-	float  DMRotVelocityCorrection = 1, GasRotVelocityCorrection = 1;
-	double SphereMass, SphereCoreMass, SphereCoreDens;
-	double alpha, beta, theta;
-	double SphereCritMass;
-	double Scale_Factor[MAX_SPHERES];
-	double term1, term2;
-	double radius_vr[NR], vr[NR], exterior_rho[NR], radial_velocity;
-	float sin_deltaDisk[MAX_SPHERES];
-	double SchwarzschildRadius, CavityRadius, InnerDensity, InnerTemperature,
-		ThickenTransitionRadius, BHMass, ScaleHeight, InnerScaleHeight;
-	double MidplaneDensity, MidplaneTemperature;
-	
-	double DM_rho=0.0;
-	double DM_vel[MAX_DIMENSION];
-	for(int dim=0;dim<GridRank;dim++)
-		DM_vel[dim]=0.0;
-	double DM_sigma=1.0; *
-	*/
-	
+	/* test disk parameters in cgs units
+           - disk parameters from enzo-e/input/IsolatedGalaxy 
+           - Hernquist halo: M_vir = 3e10 M_sun, r_vir = 65.57 kpc */
+
+	galaxy_parameters test;
+
+	if (legacy) {
+	  test.N_x = 101;
+	  test.N_z = 144;
+
+	  test.r_s = 1.2856989923909257e+22;
+	  test.z_s = 8.999892947045047e+21;
+	  test.dx = 0.1*test.r_s;
+	  test.dz = 0.1*test.z_s;
+
+	  // disk mass = 1.3913997490703146e+41 g
+	  test.sigma = 1.3396564680155456e-4;
+	  test.v_s = sqrt(poisson_coeff * test.sigma * test.r_s);
+
+	  test.halo_mass = 8.008978055391178e+43;
+	  test.halo_scale = 3.2109177913790463e+22;
+	}
+
 	/* Pre-compute cloud properties before looping over mesh */
 	for (sphere = 0; sphere < NumberOfSpheres; sphere++)
 	{
@@ -449,16 +467,40 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
 		r_max[sphere] = SphereRadius[sphere] * kpc_cm/LengthUnits;
 		
-		//SoundSpeed[sphere] = sqrt((SphereTemperature[sphere] * Gamma * kboltz) / (mu * mh)) 
-		// isothermal speed of sound
 		SoundSpeed[sphere] = sqrt(kboltz * SphereTemperature[sphere] / (mu * mh)) 
 		                     / VelocityUnits;
 		
-		if((MyProcessorNumber == ROOT_PROCESSOR)) {
+		if(debug && (MyProcessorNumber == ROOT_PROCESSOR)) {
 		  printf("Sphere radius: %"GSYM" kpc, %"GSYM"\n", SphereRadius[sphere], r_max[sphere]);
-		  printf("Speed of sound: %"GSYM"cm/s\n", SoundSpeed[sphere] * VelocityUnits);
+		  printf("Background density: %"GSYM" g/cm^3\n", InitialDensity * DensityUnits);
+		  printf("Isothermal speed of sound: %"GSYM" cm/s\n", SoundSpeed[sphere] * VelocityUnits);
+		  if (legacy) 
+		    printf("Central disk velocity =  %"GSYM"cm/s\n", test.v_s);
 		}
+
+		/* compute disk data using legacy method */
+
+		if (legacy) {
+		  Galaxy[sphere] = hydrostatic_disk(test.N_x, test.N_z, test.dx, test.dz, test.r_s, test.z_s, 
+						    test.sigma, SoundSpeed[sphere] * VelocityUnits);
+
+		  Galaxy[sphere].set_halo_mass(test.halo_mass);
+		  Galaxy[sphere].set_halo_scale(test.halo_scale);
+
+		  double err=1.0;	
+		  int counter=0;
 		
+		  while( err > 1.0e-6 && counter < 100 )
+		  {
+		    err=Galaxy[sphere].integrate();
+		    counter++;
+		    if(MyProcessorNumber == ROOT_PROCESSOR)
+		      printf("\nLegacy model sphere %i: %ith iteration, error=%e\n", sphere, counter, err);
+		  }
+
+		  Galaxy[sphere].rotation_curve();
+		}
+
 	}// ENDFOR sphere
 
 	int i, j, k;
@@ -472,10 +514,12 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 	float cosphi, sinphi, sintheta, vphi;
 	float RotVelocity[MAX_DIMENSION];
 
+	/*
 	if((MyProcessorNumber == ROOT_PROCESSOR))
 	  for (i = 0; i < GridDimension[0]; i++)
 	    printf("Delta x: %"GSYM" pc\n", CellWidth[0][i]*LengthUnits/pc_cm);
-	
+	*/
+
 	for (k = 0; k < GridDimension[2]; k++)
 	  for (j = 0; j < GridDimension[1]; j++)
 	    for (i = 0; i < GridDimension[0]; i++, n++) {
@@ -515,11 +559,40 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 		  sintheta = sqrt(xpos*xpos + ypos*ypos)/sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
 
 		  // interpolate disk data
-		  density = max(InitialDensity,
-				DiskTable[sphere].InterpolateEquilibriumDensityTable(rcyl*LengthUnits, zpos *LengthUnits)/DensityUnits);
-		  //vphi = (density > InitialDensity) ? 
-		  vphi = DiskTable[sphere].InterpolateEquilibriumVcircTable(rcyl*LengthUnits, zpos*LengthUnits) / VelocityUnits; // : 0.0;
-		  //vphi *= (1.0 - exp(1.0 - density/InitialDensity));
+		  if (legacy)
+		  {
+		    double v_g_sqr, v_p_sqr, v_dm_sqr;
+		    double r_n = 0.5*rcyl*LengthUnits / (test.r_s); // normalized radial coordinate
+		    
+		    density = max(InitialDensity,
+                                  Galaxy[sphere].intpl_rho(rcyl*LengthUnits, fabs(zpos)*LengthUnits) / DensityUnits);
+		    
+		    v_g_sqr  = pow(test.v_s * r_n, 2) * (BESSI0(r_n) * BESSK0(r_n) - BESSI1(r_n) * BESSK1(r_n)) 
+		              / (VelocityUnits*VelocityUnits);
+		    v_p_sqr  = Galaxy[sphere].intpl_v_sqr(rcyl*LengthUnits, fabs(zpos)*LengthUnits) 
+		              / (VelocityUnits*VelocityUnits);
+		    v_dm_sqr = Galaxy[sphere].halo_vel_sqr(rcyl*LengthUnits, 0.0)
+		              / (VelocityUnits*VelocityUnits);
+
+		    vphi = sqrt(fmax(0.0, v_g_sqr + v_p_sqr + v_dm_sqr));
+		    /*
+		    if (debug && fabs(ypos) <= CellWidth[1][j] && fabs(zpos) <= CellWidth[2][k])
+		    {
+		      printf("r_n = %"GSYM": v_g_sqr =  %"GSYM", v_p_sqr =  %"GSYM", v_dm_sqr =  %"GSYM", vphi = %"GSYM"\n", 
+			     2*r_n, v_g_sqr * VelocityUnits*VelocityUnits, v_p_sqr * VelocityUnits*VelocityUnits, 
+			     v_dm_sqr * VelocityUnits*VelocityUnits, vphi * VelocityUnits);
+		    }
+		    */
+		  }
+		  else 
+		  {
+		    density = max(InitialDensity,
+  				  DiskTable[sphere].InterpolateEquilibriumDensityTable(rcyl*LengthUnits, zpos*LengthUnits) / DensityUnits);
+
+		    vphi = DiskTable[sphere].InterpolateEquilibriumVcircTable(rcyl*LengthUnits, zpos*LengthUnits) / VelocityUnits;
+		  }
+
+		  //vphi *= (1.0 - (1.0 - exp(SmoothFactor*r/r_max[sphere]))/(1.0 - exp(SmoothFactor)));
 
 		  RotVelocity[0] = -vphi*sinphi*sintheta;
 		  RotVelocity[1] = vphi*cosphi*sintheta;

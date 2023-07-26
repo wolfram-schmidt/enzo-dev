@@ -58,10 +58,11 @@ void EquilibriumGalaxyDisk::ReadInData(char *fname)
 
     this->gas_disk_log_rho[i][j] = log(1e-3*rho); // SI to cgs
     this->gas_disk_vcirc[i][j] = 1e2*vcirc; // SI to cgs
-
+    /*
     if (debug && (MyProcessorNumber == ROOT_PROCESSOR)) 
       printf("i=%d, r=%f, j=%d, z=%f, %f, %e\n",
 	     i, this->gas_disk_zones_r[i], j, z, this->gas_disk_log_rho[i][j], this->gas_disk_vcirc[i][j]);
+    */
 
     i++;
     r_prev = r;
