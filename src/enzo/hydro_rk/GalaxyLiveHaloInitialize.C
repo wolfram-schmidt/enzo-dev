@@ -77,7 +77,8 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
   /* set default parameters */
   int MHDGalaxyDiskNumberOfSpheres = 1;
   int MHDGalaxyDiskRefineAtStart   = TRUE;
-  int MHDGalaxyDiskUseParticles    = FALSE;
+  int MHDGalaxyDiskUseParticles    = TRUE;
+  int MHDGalaxyDiskUseGas          = TRUE;
   int MHDGalaxyDiskUseColour       = FALSE;
   int MHDGalaxyDiskUseMetals       = FALSE;
   float MHDGalaxyDiskParticleMeanDensity = FLOAT_UNDEFINED;
@@ -172,6 +173,8 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 		  &MHDGalaxyDiskRefineAtStart);
     ret += sscanf(line, "MHDGalaxyDiskUseParticles = %"ISYM, 
 		  &MHDGalaxyDiskUseParticles);
+    ret += sscanf(line, "MHDGalaxyDiskUseGas = %"ISYM, 
+		  &MHDGalaxyDiskUseGas);
     ret += sscanf(line, "MHDGalaxyDiskParticleMeanDensity = %"FSYM,
 		  &MHDGalaxyDiskParticleMeanDensity);
     ret += sscanf(line, "MHDGalaxyDiskUseColour = %"ISYM, 
@@ -314,15 +317,12 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 					MHDGalaxyDiskInitialDensity,
 					MHDGalaxyDiskInitialMagnField,
 					MHDGalaxyDiskUseParticles,
+					MHDGalaxyDiskUseGas,
 					0,
 					SetBaryonFields,
-					1,
-					TopGridSpacing,
-					MaximumRefinementLevel,
-					MHDGalaxyDisk_UseInterpolGridTraditional,
-					MHDGalaxyDisk_GridSafetyFactor) == FAIL) {
-    			ENZO_FAIL("Error in GalaxyLiveHaloInitializeGrid.");
-  			}
+					1) == FAIL) {
+	  ENZO_FAIL("Error in GalaxyLiveHaloInitializeGrid.");
+	}
 	CurrentGrid = CurrentGrid->NextGridThisLevel;
   }
 
@@ -377,13 +377,10 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 				MHDGalaxyDiskInitialDensity,
 				MHDGalaxyDiskInitialMagnField,
 				MHDGalaxyDiskUseParticles,
+				MHDGalaxyDiskUseGas,
 				level,   // S. Selg (11/2019, used to be level+1)
 				SetBaryonFields,
-				0,
-				TopGridSpacing,
-				MaximumRefinementLevel,
-				MHDGalaxyDisk_UseInterpolGridTraditional,
-				MHDGalaxyDisk_GridSafetyFactor) == FAIL) 
+				0) == FAIL) 
 				{
 					fprintf(stderr, "Error in GalaxyLiveHaloInitializeGrid.\n");
 					return FAIL;
@@ -408,206 +405,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 			  Temp = Temp->NextGridThisLevel;
 		  }
 	  }
-  } //end: if (MHDGalaxyDiskRefineAtStart)
-
-
-
-  /* If requested and there are no manual settings of the refinement
-     of spheres, refine the grid to the desired level. */
-
-/*  int MaxInitialLevel = 0;
-  for (sphere = 0; sphere < MHDGalaxyDiskNumberOfSpheres; sphere++)
-    MaxInitialLevel = max(MaxInitialLevel, MHDGalaxyDiskInitialLevel[sphere]);
-
-  if (MHDGalaxyDiskRefineAtStart) {
-
-    * If the user specified an initial refinement level for a sphere,
-       then manually create the hierarchy first. 
-
-    if (MaxInitialLevel > 0) {
-
-      int lev, max_level;
-      float dx;
-      HierarchyEntry **Subgrid;
-      int NumberOfSubgridDims[MAX_DIMENSION];
-      FLOAT ThisLeftEdge[MAX_DIMENSION], ThisRightEdge[MAX_DIMENSION];
-
-      for (sphere = 0; sphere < MHDGalaxyDiskNumberOfSpheres; sphere++) {
-	
-	max_level = MHDGalaxyDiskInitialLevel[sphere];
-	if (max_level > 0) {
-
-	  Subgrid = new HierarchyEntry*[max_level];
-	  for (lev = 0; lev < max_level; lev++)
-	    Subgrid[lev] = new HierarchyEntry;
-
-	  for (lev = 0; lev < max_level; lev++) {
-	    
-	    for (dim = 0; dim < MetaData.TopGridRank; dim++) {
-	      dx = 1.0 / float(MetaData.TopGridDims[dim]) / POW(RefineBy, lev);
-	      ThisLeftEdge[dim] = MHDGalaxyDiskPosition[sphere][dim] -
-		0.5 * MHDGalaxyDiskRadius[sphere][dim] - 2*dx;  // plus some buffer
-	      ThisLeftEdge[dim] = nint(ThisLeftEdge[dim] / dx) * dx;
-	      ThisRightEdge[dim] = MHDGalaxyDiskPosition[sphere][dim] +
-		0.5 * MHDGalaxyDiskRadius[sphere][dim] + 2*dx;
-	      ThisRightEdge[dim] = nint(ThisRightEdge[dim] / dx) * dx;
-	      NumberOfSubgridDims[dim] = 
-		nint((ThisRightEdge[dim] - ThisLeftEdge[dim]) / 
-		     (DomainRightEdge[dim] - DomainLeftEdge[dim]) / dx);		
-	    } // ENDFOR dims
-
-	    if (debug)
-	      printf("MHDGalaxyDisk:: Level[%"ISYM"]: NumberOfSubgridZones[0] = %"ISYM"\n",
-		     lev+1, NumberOfSubgridDims[0]);
-	    
-	    if (NumberOfSubgridDims[0] > 0) {
-
-	      // Insert into AMR hierarchy
-	      if (lev == 0) {
-		Subgrid[lev]->NextGridThisLevel = TopGrid.NextGridNextLevel;
-		TopGrid.NextGridNextLevel = Subgrid[lev];
-		Subgrid[lev]->ParentGrid = &TopGrid;
-	      } else {
-		Subgrid[lev]->NextGridThisLevel = NULL;
-		Subgrid[lev]->ParentGrid = Subgrid[lev-1];
-	      }
-	      if (lev == max_level-1)
-		Subgrid[lev]->NextGridNextLevel = NULL;
-	      else
-		Subgrid[lev]->NextGridNextLevel = Subgrid[lev+1];
-
-	      // Create grid
-	      for (dim = 0; dim < MetaData.TopGridRank; dim++)
-		NumberOfSubgridDims[dim] += 2*NumberOfGhostZones;
-	      Subgrid[lev]->GridData = new grid;
-	      Subgrid[lev]->GridData->InheritProperties(TopGrid.GridData);
-	      Subgrid[lev]->GridData->PrepareGrid(MetaData.TopGridRank, 
-						  NumberOfSubgridDims,
-						  ThisLeftEdge,
-						  ThisRightEdge, 0);
-
-
-	      if (Subgrid[lev]->GridData->GalaxyLiveHaloInitializeGrid(
-				MHDGalaxyDiskNumberOfSpheres,
-				MHDGalaxyDiskRadius,
-				MHDGalaxyDiskAngularMomentum,
-				MHDGalaxyDiskCoreRadius,
-				MHDGalaxyDiskDensity,
-				MHDGalaxyDiskTemperature,
-				MHDGalaxyDiskMetallicity,
-				MHDGalaxyDiskPosition,
-				MHDGalaxyDiskVelocity,
-				MHDGalaxyDiskFracKeplerianRot,
-				MHDGalaxyDiskTurbulence,
-				MHDGalaxyDiskDispersion,
-				MHDGalaxyDiskCutOff,
-				MHDGalaxyDiskAng1,
-				MHDGalaxyDiskAng2,
-				MHDGalaxyDiskNumShells,
-				MHDGalaxyDiskType,
-				MHDGalaxyDiskConstantPressure,
-				MHDGalaxyDiskSmoothSurface,
-				MHDGalaxyDiskSmoothRadius,
-				MHDGalaxyDiskMagnFactor,
-				MHDGalaxyDiskMagnEquipart,
-				MHDGalaxyDiskHaloMass,
-				MHDGalaxyDiskHaloCoreRadius,
-				MHDGalaxyDiskHaloRadius,
-				MHDGalaxyDiskUseParticles,
-				MHDGalaxyDiskParticleMeanDensity,
-				MHDGalaxyDiskUniformVelocity,
-				MHDGalaxyDiskUseColour,
-				MHDGalaxyDiskUseMetals,
-				MHDGalaxyDiskInitialTemperature,
-				MHDGalaxyDiskInitialDensity,
-				MHDGalaxyDiskInitialMagnField,
-				MHDGalaxyDiskPressureGradientType,
-				lev-1) == FAIL) {
-		ENZO_FAIL("Error in GalaxyLiveHaloInitializeGrid.");
-	      }
-	      
-	    } // ENDIF zones exist
-	  } // ENDFOR levels
-	} // ENDIF max_level > 0
-      } // ENDFOR spheres
-    } // ENDIF MaxInitialLevel > 0
-
-     Declare, initialize and fill out the LevelArray. 
-
-    LevelHierarchyEntry *LevelArray[MAX_DEPTH_OF_HIERARCHY];
-    for (level = 0; level < MAX_DEPTH_OF_HIERARCHY; level++)
-      LevelArray[level] = NULL;
-    AddLevel(LevelArray, &TopGrid, 0);
-
-     Add levels to the maximum depth or until no new levels are created,
-       and re-initialize the level after it is created. 
-
-    if (MaxInitialLevel == 0) {
-      for (level = 0; level < MaximumRefinementLevel; level++) {
-	if (RebuildHierarchy(&MetaData, LevelArray, level) == FAIL) {
-	  ENZO_FAIL("Error in RebuildHierarchy.");
-	}
-	if (LevelArray[level+1] == NULL)
-	  break;
-	LevelHierarchyEntry *Temp = LevelArray[level+1];
-	while (Temp != NULL) {
-		if (Temp->GridData->GalaxyLiveHaloInitializeGrid(
-			MHDGalaxyDiskNumberOfSpheres,
-			MHDGalaxyDiskRadius,
-			MHDGalaxyDiskAngularMomentum,
-			MHDGalaxyDiskCoreRadius,
-			MHDGalaxyDiskDensity,
-			MHDGalaxyDiskTemperature,
-			MHDGalaxyDiskMetallicity,
-			MHDGalaxyDiskPosition,
-			MHDGalaxyDiskVelocity,
-			MHDGalaxyDiskFracKeplerianRot,
-			MHDGalaxyDiskTurbulence,
-			MHDGalaxyDiskDispersion,
-			MHDGalaxyDiskCutOff,
-			MHDGalaxyDiskAng1,
-			MHDGalaxyDiskAng2,
-			MHDGalaxyDiskNumShells,
-			MHDGalaxyDiskType,
-			MHDGalaxyDiskConstantPressure,
-			MHDGalaxyDiskSmoothSurface,
-			MHDGalaxyDiskSmoothRadius,
-			MHDGalaxyDiskMagnFactor,
-			MHDGalaxyDiskMagnEquipart,
-			MHDGalaxyDiskHaloMass,
-			MHDGalaxyDiskHaloCoreRadius,
-			MHDGalaxyDiskHaloRadius,
-			MHDGalaxyDiskUseParticles,
-			MHDGalaxyDiskParticleMeanDensity,
-			MHDGalaxyDiskUniformVelocity,
-			MHDGalaxyDiskUseColour,
-			MHDGalaxyDiskUseMetals,
-			MHDGalaxyDiskInitialTemperature,
-			MHDGalaxyDiskInitialDensity,
-			MHDGalaxyDiskInitialMagnField,
-			MHDGalaxyDiskPressureGradientType,
-			level+1) == FAIL) {
-	    ENZO_FAIL("Error in GalaxyLiveHaloInitializeGrid.");
-	  }
-	  Temp = Temp->NextGridThisLevel;
-	}
-      } // end: loop over levels
-    } // ENDELSE manually set refinement levels
-
-     Loop back from the bottom, restoring the consistency among levels. 
-
-    for (level = MaximumRefinementLevel; level > 0; level--) {
-      LevelHierarchyEntry *Temp = LevelArray[level];
-      while (Temp != NULL) {
-	if (Temp->GridData->ProjectSolutionToParentGrid(
-			      *LevelArray[level-1]->GridData) == FAIL) {
-	  ENZO_FAIL("Error in grid->ProjectSolutionToParentGrid.");
-	}
-	Temp = Temp->NextGridThisLevel;
-      }
-    }
-
-  } // end: if (MHDGalaxyDiskRefineAtStart) */
+    } //end: if (MHDGalaxyDiskRefineAtStart)
 
 	/* set up field names and units */
 	
@@ -671,6 +469,8 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 	    MHDGalaxyDiskRefineAtStart);
     fprintf(Outfptr, "MHDGalaxyDiskUseParticles       = %"ISYM"\n",
 	    MHDGalaxyDiskUseParticles);
+    fprintf(Outfptr, "MHDGalaxyDiskUseGas             = %"ISYM"\n",
+	    MHDGalaxyDiskUseGas);
     fprintf(Outfptr, "MHDGalaxyDiskUseColour          = %"ISYM"\n",
 	    MHDGalaxyDiskUseColour);
     fprintf(Outfptr, "MHDGalaxyDiskUseMetals          = %"ISYM"\n",
