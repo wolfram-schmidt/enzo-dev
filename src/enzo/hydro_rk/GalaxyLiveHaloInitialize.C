@@ -4,6 +4,7 @@
 /
 /  written by: Kai Rodenbeck and Simon Selg
 /  date:       July, 2020
+/  modified:   August, 2023
 /
 /  PURPOSE:
 /    Sets up one or more disk galaxies and particle halos.
@@ -75,89 +76,42 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
   int   dim, ret, level, sphere, i;
 
   /* set default parameters */
-  int MHDGalaxyDiskNumberOfSpheres = 1;
-  int MHDGalaxyDiskRefineAtStart   = TRUE;
-  int MHDGalaxyDiskUseParticles    = TRUE;
-  int MHDGalaxyDiskUseGas          = TRUE;
-  int MHDGalaxyDiskUseColour       = FALSE;
-  int MHDGalaxyDiskUseMetals       = FALSE;
-  float MHDGalaxyDiskParticleMeanDensity = FLOAT_UNDEFINED;
-  float MHDGalaxyDiskInitialTemperature = 1000;
-  float MHDGalaxyDiskInitialDensity     = 1.0;
-  float MHDGalaxyDiskInitialMagnField   = 0.0;
 
-  // S. Selg (07/2020)
-  int MHDGalaxyDisk_UseInterpolGridTraditional = TRUE;
-  float MHDGalaxyDisk_GridSafetyFactor         = 1.0;
+  int DiskNumberOfSpheres = 1;
+  int DiskRefineAtStart   = TRUE;
+  int UseParticles    = TRUE;
+  int UseGas          = TRUE;
+  int UseMetals       = FALSE;
 
-  int MHDGalaxyDiskNumShells[MAX_SPHERES],
-      MHDGalaxyDiskInitialLevel[MAX_SPHERES],
-      MHDGalaxyDiskType[MAX_SPHERES],
-      MHDGalaxyDiskConstantPressure[MAX_SPHERES],
-      MHDGalaxyDiskMagnEquipart[MAX_SPHERES],
-      MHDGalaxyDiskSmoothSurface[MAX_SPHERES],
-      MHDGalaxyDiskPressureGradientType[MAX_SPHERES]; // S.C.S (08/2019)
+  float InitialTemperature = 1e4;  // 10.000 K
+  float InitialDensity     = 1e-3; // in code units
+  float InitialMagnField   = 0.0;
 
-  float MHDGalaxyDiskDensity[MAX_SPHERES],
-        MHDGalaxyDiskTemperature[MAX_SPHERES],
-        MHDGalaxyDiskFracKeplerianRot[MAX_SPHERES],
-        MHDGalaxyDiskTurbulence[MAX_SPHERES],
-        MHDGalaxyDiskDispersion[MAX_SPHERES],
-        MHDGalaxyDiskCutOff[MAX_SPHERES],
-        MHDGalaxyDiskAng1[MAX_SPHERES],
-        MHDGalaxyDiskAng2[MAX_SPHERES],
-        MHDGalaxyDiskMetallicity[MAX_SPHERES],
-        MHDGalaxyDiskSmoothRadius[MAX_SPHERES],
-        MHDGalaxyDiskMagnFactor[MAX_SPHERES],
-        MHDGalaxyDiskHaloRadius[MAX_SPHERES],
-        MHDGalaxyDiskHaloCoreRadius[MAX_SPHERES],
-        MHDGalaxyDiskHaloMass[MAX_SPHERES];
+  float DiskRadius[MAX_SPHERES],
+	    DiskTemperature[MAX_SPHERES],
+        DiskBeta[MAX_SPHERES],
+        DiskMetallicity[MAX_SPHERES];
 
-  float MHDGalaxyDiskUniformVelocity[MAX_DIMENSION];
-
-  float MHDGalaxyDiskPosition[MAX_SPHERES][MAX_DIMENSION], 
-        MHDGalaxyDiskRadius[MAX_SPHERES],
-        MHDGalaxyDiskCoreRadius[MAX_SPHERES][MAX_DIMENSION],
-        MHDGalaxyDiskVelocity[MAX_SPHERES][MAX_DIMENSION],
-        MHDGalaxyDiskAngularMomentum[MAX_SPHERES][MAX_DIMENSION];
+  float DiskPosition[MAX_SPHERES][MAX_DIMENSION],
+	    DiskRotAxis[MAX_SPHERES][MAX_DIMENSION], 
+        DiskVelocity[MAX_SPHERES][MAX_DIMENSION];
 
   EquilibriumGalaxyDisk DiskTable[MAX_SPHERES];
 
   for (sphere = 0; sphere < MAX_SPHERES; sphere++) {
-    MHDGalaxyDiskPressureGradientType[sphere]   = 2; // S.C.S (08/2019)
-    MHDGalaxyDiskDensity[sphere]		= 1.0;
-    MHDGalaxyDiskTemperature[sphere]	= 1.0;
-    MHDGalaxyDiskFracKeplerianRot[sphere]	= 0.0;
-    MHDGalaxyDiskTurbulence[sphere]	= 0.0;
-    MHDGalaxyDiskDispersion[sphere]	= 0.0;
-    MHDGalaxyDiskCutOff[sphere]		= 6.5;
-    MHDGalaxyDiskAng1[sphere]			= 0;
-    MHDGalaxyDiskAng2[sphere]			= 0;
-    MHDGalaxyDiskNumShells[sphere]		= 1;
-    MHDGalaxyDiskSmoothRadius[sphere]	= 1.2;
-    MHDGalaxyDiskMetallicity[sphere]	= 0;
-    MHDGalaxyDiskInitialLevel[sphere]	= 0;
-    MHDGalaxyDiskMagnFactor[sphere]	= 0.0;
-    MHDGalaxyDiskHaloCoreRadius[sphere]		= 0.2;
-    MHDGalaxyDiskHaloRadius[sphere]			= 10.0;
-    MHDGalaxyDiskHaloMass[sphere]			= 1.0e11;
-    MHDGalaxyDiskRadius[sphere]     = 10;
+    DiskTemperature[sphere]	= InitialTemperature;
+    DiskBeta[sphere]        = huge_number; // hydrodynamical
+    DiskMetallicity[sphere]	= 0;
+
+	/* disk at rest centered in box */
 
     for (dim = 0; dim < MAX_DIMENSION; dim++) {
-      MHDGalaxyDiskPosition[sphere][dim] = 0.5*(DomainLeftEdge[dim] +
-						     DomainRightEdge[dim]);
-      MHDGalaxyDiskVelocity[sphere][dim] = 0;
-    MHDGalaxyDiskCoreRadius[sphere][dim] = 0.2;
-	MHDGalaxyDiskAngularMomentum[sphere][dim]=0.0;
+      DiskPosition[sphere][dim] = 0.5*(DomainLeftEdge[dim] + DomainRightEdge[dim]);
+ 	  DiskRotAxis[sphere][dim] = 0.0;
+      DiskVelocity[sphere][dim] = 0.0;
     }
-    MHDGalaxyDiskAngularMomentum[sphere][0]=1.0;
-    MHDGalaxyDiskType[sphere]       = 0;
-    MHDGalaxyDiskConstantPressure[sphere] = FALSE;
-    MHDGalaxyDiskMagnEquipart[sphere] = FALSE;
-    MHDGalaxyDiskSmoothSurface[sphere] = FALSE;
+    DiskRotAxis[sphere][2] = 1.0; // rotation axis in z-direction
   }
-  for (dim = 0; dim < MAX_DIMENSION; dim++)
-    MHDGalaxyDiskUniformVelocity[dim] = 0;
 
   /* read input from file */
 
@@ -167,129 +121,62 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 
     /* read parameters */
 
-    ret += sscanf(line, "MHDGalaxyDiskNumberOfSpheres = %"ISYM,
-		  &MHDGalaxyDiskNumberOfSpheres);
-    ret += sscanf(line, "MHDGalaxyDiskRefineAtStart = %"ISYM, 
-		  &MHDGalaxyDiskRefineAtStart);
-    ret += sscanf(line, "MHDGalaxyDiskUseParticles = %"ISYM, 
-		  &MHDGalaxyDiskUseParticles);
-    ret += sscanf(line, "MHDGalaxyDiskUseGas = %"ISYM, 
-		  &MHDGalaxyDiskUseGas);
-    ret += sscanf(line, "MHDGalaxyDiskParticleMeanDensity = %"FSYM,
-		  &MHDGalaxyDiskParticleMeanDensity);
-    ret += sscanf(line, "MHDGalaxyDiskUseColour = %"ISYM, 
-		  &MHDGalaxyDiskUseColour);
-    ret += sscanf(line, "MHDGalaxyDiskUseMetals = %"ISYM, 
-		  &MHDGalaxyDiskUseMetals);
-    ret += sscanf(line, "MHDGalaxyDiskInitialTemperature = %"FSYM, 
-		  &MHDGalaxyDiskInitialTemperature);
-    ret += sscanf(line, "MHDGalaxyDiskInitialDensity = %"FSYM,
-		  &MHDGalaxyDiskInitialDensity);
-    ret += sscanf(line, "MHDGalaxyDiskInitialMagnField = %"FSYM,
-		  &MHDGalaxyDiskInitialMagnField);
-    ret += sscanf(line, "MHDGalaxyDiskUniformVelocity = %"FSYM" %"FSYM" %"FSYM, 
-		  MHDGalaxyDiskUniformVelocity, MHDGalaxyDiskUniformVelocity+1,
-		  MHDGalaxyDiskUniformVelocity+2);
-    ret += sscanf(line, "MHDGalaxyDisk_UseInterpolGridTraditional = %"ISYM,
-		  &MHDGalaxyDisk_UseInterpolGridTraditional);
-    ret += sscanf(line, "MHDGalaxyDisk_GridSafetyFactor = %"FSYM,
-		    &MHDGalaxyDisk_GridSafetyFactor);
-    if (sscanf(line, "MHDGalaxyDiskPressureGradientType[%"ISYM"]", &sphere) > 0)
-	ret += sscanf(line, "MHDGalaxyDiskPressureGradientType[%"ISYM"] = %"ISYM, &sphere,
-			    &MHDGalaxyDiskPressureGradientType[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskType[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskType[%"ISYM"] = %"ISYM, &sphere,
-		    &MHDGalaxyDiskType[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskDensity[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskDensity[%"ISYM"] = %"FSYM, &sphere,
-		    &MHDGalaxyDiskDensity[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskTemperature[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskTemperature[%"ISYM"] = %"FSYM, &sphere,
-		    &MHDGalaxyDiskTemperature[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskMetallicity[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskMetallicity[%"ISYM"] = %"FSYM, &sphere,
-		    &MHDGalaxyDiskMetallicity[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskPosition[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskPosition[%"ISYM"] = %"PSYM" %"PSYM" %"PSYM, 
-		    &sphere, &MHDGalaxyDiskPosition[sphere][0],
-		    &MHDGalaxyDiskPosition[sphere][1],
-		    &MHDGalaxyDiskPosition[sphere][2]);
-    if (sscanf(line, "MHDGalaxyDiskCoreRadius[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskCoreRadius[%"ISYM"] = %"PSYM" %"PSYM" %"PSYM, 
-                  &sphere, &MHDGalaxyDiskCoreRadius[sphere][0],
-                  &MHDGalaxyDiskCoreRadius[sphere][1], 
-                  &MHDGalaxyDiskCoreRadius[sphere][2]);
-    if (sscanf(line, "MHDGalaxyDiskRadius[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskRadius[%"ISYM"] = %"FSYM, &sphere,
-		    &MHDGalaxyDiskRadius[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskAngularMomentum[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskAngularMomentum[%"ISYM"] = %"PSYM" %"PSYM" %"PSYM,
-                    &sphere, &MHDGalaxyDiskAngularMomentum[sphere][0],
-                    &MHDGalaxyDiskAngularMomentum[sphere][1],
-                    &MHDGalaxyDiskAngularMomentum[sphere][2]);
-    if (sscanf(line, "MHDGalaxyDiskVelocity[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskVelocity[%"ISYM"] = %"FSYM" %"FSYM" %"FSYM, 
-		    &sphere, &MHDGalaxyDiskVelocity[sphere][0],
-		    &MHDGalaxyDiskVelocity[sphere][1],
-		    &MHDGalaxyDiskVelocity[sphere][2]);
-    if (sscanf(line, "MHDGalaxyDiskHaloMass[%"ISYM"]", &sphere) > 0)
-    	ret += sscanf(line, "MHDGalaxyDiskHaloMass[%"ISYM"] = %"FSYM, &sphere,
-	                          &MHDGalaxyDiskHaloMass[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskHaloCoreRadius[%"ISYM"]", &sphere) > 0)
-    	ret += sscanf(line, "MHDGalaxyDiskHaloCoreRadius[%"ISYM"] = %"FSYM, &sphere,
-	                          &MHDGalaxyDiskHaloCoreRadius[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskHaloRadius[%"ISYM"]", &sphere) > 0)
-    	ret += sscanf(line, "MHDGalaxyDiskHaloRadius[%"ISYM"] = %"FSYM, &sphere,
-	                          &MHDGalaxyDiskHaloRadius[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskFracKeplerianRot[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskFracKeplerianRot[%"ISYM"] = %"FSYM, &sphere,
-                    &MHDGalaxyDiskFracKeplerianRot[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskTurbulence[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskTurbulence[%"ISYM"] = %"FSYM, &sphere,
-                    &MHDGalaxyDiskTurbulence[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskDispersion[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskDispersion[%"ISYM"] = %"FSYM, &sphere,
-                    &MHDGalaxyDiskDispersion[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskCutOff[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskCutOff[%"ISYM"] = %"FSYM, &sphere,
-                    &MHDGalaxyDiskCutOff[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskAng1[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskAng1[%"ISYM"] = %"FSYM, &sphere,
-                    &MHDGalaxyDiskAng1[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskAng2[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskAng2[%"ISYM"] = %"FSYM, &sphere,
-                    &MHDGalaxyDiskAng2[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskNumShells[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskNumShells[%"ISYM"] = %"ISYM, &sphere,
-                    &MHDGalaxyDiskNumShells[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskInitialLevel[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskInitialLevel[%"ISYM"] = %"ISYM, &sphere,
-                    &MHDGalaxyDiskInitialLevel[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskConstantPressure[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskConstantPressure[%"ISYM"] = %"ISYM, &sphere,
-		    &MHDGalaxyDiskConstantPressure[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskMagnEquipart[%"ISYM"]", &sphere) > 0)
-	ret += sscanf(line, "MHDGalaxyDiskMagnEquipart[%"ISYM"] = %"ISYM, &sphere,
-	                  &MHDGalaxyDiskMagnEquipart[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskSmoothSurface[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskSmoothSurface[%"ISYM"] = %"ISYM, &sphere,
-		    &MHDGalaxyDiskSmoothSurface[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskSmoothRadius[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "MHDGalaxyDiskSmoothRadius[%"FSYM"] = %"FSYM, &sphere,
-		    &MHDGalaxyDiskSmoothRadius[sphere]);
-    if (sscanf(line, "MHDGalaxyDiskMagnFactor[%"ISYM"]", &sphere) > 0)
-	ret += sscanf(line, "MHDGalaxyDiskMagnFactor[%"FSYM"] = %"FSYM, &sphere,
-	                  &MHDGalaxyDiskMagnFactor[sphere]);
+    ret += sscanf(line, "DiskNumberOfSpheres = %"ISYM,
+				  &DiskNumberOfSpheres);
+    ret += sscanf(line, "DiskRefineAtStart = %"ISYM, 
+				  &DiskRefineAtStart);
+    ret += sscanf(line, "UseParticles = %"ISYM, 
+				  &UseParticles);
+    ret += sscanf(line, "UseGas = %"ISYM, 
+				  &UseGas);
+    ret += sscanf(line, "UseMetals = %"ISYM, 
+				  &UseMetals);
+    ret += sscanf(line, "InitialTemperature = %"FSYM, 
+				  &InitialTemperature);
+    ret += sscanf(line, "InitialDensity = %"FSYM,
+				  &InitialDensity);
+    ret += sscanf(line, "InitialMagnField = %"FSYM,
+				  &InitialMagnField);
+    if (sscanf(line, "DiskTemperature[%"ISYM"]", &sphere) > 0)
+	    ret += sscanf(line, "DiskTemperature[%"ISYM"] = %"FSYM, &sphere,
+					  &DiskTemperature[sphere]);
+    if (sscanf(line, "DiskBeta[%"ISYM"]", &sphere) > 0)
+	    ret += sscanf(line, "DiskBeta[%"FSYM"] = %"FSYM, &sphere,
+					  &DiskBeta[sphere]);
+    if (sscanf(line, "DiskMetallicity[%"ISYM"]", &sphere) > 0)
+      	ret += sscanf(line, "DiskMetallicity[%"ISYM"] = %"FSYM, &sphere,
+					  &DiskMetallicity[sphere]);
+    if (sscanf(line, "DiskRadius[%"ISYM"]", &sphere) > 0)
+      	ret += sscanf(line, "DiskRadius[%"ISYM"] = %"FSYM, &sphere,
+					  &DiskRadius[sphere]);
+    if (sscanf(line, "DiskPosition[%"ISYM"]", &sphere) > 0)
+      	ret += sscanf(line, "DiskPosition[%"ISYM"] = %"PSYM" %"PSYM" %"PSYM, 
+					  &sphere, 
+					  &DiskPosition[sphere][0],
+					  &DiskPosition[sphere][1],
+					  &DiskPosition[sphere][2]);
+    if (sscanf(line, "DiskRotAxis[%"ISYM"]", &sphere) > 0)
+      	ret += sscanf(line, "DiskRotAxis[%"ISYM"] = %"PSYM" %"PSYM" %"PSYM,
+					  &sphere, 
+					  &DiskRotAxis[sphere][0],
+					  &DiskRotAxis[sphere][1],
+					  &DiskRotAxis[sphere][2]);
+    if (sscanf(line, "DiskVelocity[%"ISYM"]", &sphere) > 0)
+      	ret += sscanf(line, "DiskVelocity[%"ISYM"] = %"FSYM" %"FSYM" %"FSYM, 
+					  &sphere, 
+					  &DiskVelocity[sphere][0],
+					  &DiskVelocity[sphere][1],
+					  &DiskVelocity[sphere][2]);
 
     /* if the line is suspicious, issue a warning */
 
-    if (ret == 0 && strstr(line, "=") && strstr(line, "MHDGalaxyDisk") 
-	&& line[0] != '#' && MyProcessorNumber == ROOT_PROCESSOR)
+    if (ret == 0 && strstr(line, "=") && strstr(line, "Disk") 
+	    && line[0] != '#' && MyProcessorNumber == ROOT_PROCESSOR)
       fprintf(stderr, "warning: the following parameter line was not interpreted:\n%s\n", line);
 
   } // end input from parameter file
 
-  for (sphere = 0; sphere < MHDGalaxyDiskNumberOfSpheres; sphere++)
+  for (sphere = 0; sphere < DiskNumberOfSpheres; sphere++)
     DiskTable[sphere].ReadInData("disk-hernq.dat");
 
   /* set up grid */
@@ -305,19 +192,20 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
   CurrentGrid = &TopGrid;
   while (CurrentGrid != NULL) {
   	if (CurrentGrid->GridData->GalaxyLiveHaloInitializeGrid(
-					MHDGalaxyDiskNumberOfSpheres,
+					DiskNumberOfSpheres,
 					DiskTable,
-					MHDGalaxyDiskPosition,
-					MHDGalaxyDiskAngularMomentum,
-					MHDGalaxyDiskVelocity,
-					MHDGalaxyDiskRadius,
-					MHDGalaxyDiskTemperature,
-					MHDGalaxyDiskMetallicity,
-					MHDGalaxyDiskInitialTemperature,
-					MHDGalaxyDiskInitialDensity,
-					MHDGalaxyDiskInitialMagnField,
-					MHDGalaxyDiskUseParticles,
-					MHDGalaxyDiskUseGas,
+					DiskPosition,
+					DiskRotAxis,
+					DiskVelocity,
+					DiskRadius,
+					DiskTemperature,
+				    DiskBeta,
+					DiskMetallicity,
+					InitialTemperature,
+					InitialDensity,
+					InitialMagnField,
+					UseParticles,
+					UseGas,
 					0,
 					SetBaryonFields,
 					1) == FAIL) {
@@ -331,20 +219,21 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 
   if (SetBaryonFields) {
 
-  /* Convert minimum initial overdensity for refinement to mass
-     (unless MinimumMass itself was actually set). */
-  for (int count = 0; count < MAX_FLAGGING_METHODS; count++)
-    if (MinimumMassForRefinement[count] == FLOAT_UNDEFINED) {
-      MinimumMassForRefinement[count] = MinimumOverDensityForRefinement[count];
-      for (dim = 0; dim < MetaData.TopGridRank; dim++)
-        MinimumMassForRefinement[count] *=(DomainRightEdge[dim]-DomainLeftEdge[dim])/
-	     float(MetaData.TopGridDims[dim]);
-    }
+	/* Convert minimum initial overdensity for refinement to mass
+       (unless MinimumMass itself was actually set). */
 
-  // (S. Selg, 10/2019) The following lines use the code from ClusterInitialize and are to 
-  // implement a refinement at start 
-  // If requested, refine the grids to the desired level
-  if (MHDGalaxyDiskRefineAtStart) {
+	for (int count = 0; count < MAX_FLAGGING_METHODS; count++)
+	  if (MinimumMassForRefinement[count] == FLOAT_UNDEFINED) {
+		MinimumMassForRefinement[count] = MinimumOverDensityForRefinement[count];
+		for (dim = 0; dim < MetaData.TopGridRank; dim++)
+		  MinimumMassForRefinement[count] *=(DomainRightEdge[dim]-DomainLeftEdge[dim])/
+			float(MetaData.TopGridDims[dim]);
+	  }
+
+	/* (S. Selg, 10/2019) The following lines use the code from ClusterInitialize and are to 
+	   implement a refinement at start. If requested, refine the grids to the desired level. */
+
+	if (DiskRefineAtStart) {
 	  // Declare, initialize and fill out the LevelArray
 	  LevelHierarchyEntry *LevelArray[MAX_DEPTH_OF_HIERARCHY];
 	  for (level = 0; level < MAX_DEPTH_OF_HIERARCHY; level++)
@@ -365,19 +254,20 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 		  while (Temp != NULL)
 		  {
 			  if (Temp->GridData->GalaxyLiveHaloInitializeGrid(
-				MHDGalaxyDiskNumberOfSpheres,
+				DiskNumberOfSpheres,
 				DiskTable,
-				MHDGalaxyDiskPosition,
-				MHDGalaxyDiskAngularMomentum,
-				MHDGalaxyDiskVelocity,
-				MHDGalaxyDiskRadius,
-				MHDGalaxyDiskTemperature,
-				MHDGalaxyDiskMetallicity,
-				MHDGalaxyDiskInitialTemperature,
-				MHDGalaxyDiskInitialDensity,
-				MHDGalaxyDiskInitialMagnField,
-				MHDGalaxyDiskUseParticles,
-				MHDGalaxyDiskUseGas,
+				DiskPosition,
+				DiskRotAxis,
+				DiskVelocity,
+				DiskRadius,
+				DiskTemperature,
+				DiskBeta,
+				DiskMetallicity,
+				InitialTemperature,
+				InitialDensity,
+				InitialMagnField,
+				UseParticles,
+				UseGas,
 				level,   // S. Selg (11/2019, used to be level+1)
 				SetBaryonFields,
 				0) == FAIL) 
@@ -395,7 +285,6 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 		  LevelHierarchyEntry *Temp = LevelArray[level];
 		  while (Temp != NULL)
 		  {
-	//		  if (Temp->GridData->ProjectSolutionToParentGrid(*Temp->GridHierarchyEntry->ParentGrid->GridData) == FAIL) 
 			  if (Temp->GridData->ProjectSolutionToParentGrid(
 				*LevelArray[level-1]->GridData) == FAIL)		  
 			  {
@@ -405,7 +294,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 			  Temp = Temp->NextGridThisLevel;
 		  }
 	  }
-    } //end: if (MHDGalaxyDiskRefineAtStart)
+    } // end: if (DiskRefineAtStart)
 
 	/* set up field names and units */
 	
@@ -447,84 +336,58 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 			DataLabel[count++] = (char*) DIIName;
 			DataLabel[count++] = (char*) HDIName;
 		}
-	}  // if Multispecies
-  if (MHDGalaxyDiskUseColour)
-    DataLabel[count++] = (char*) ColourName;
-  if (MHDGalaxyDiskUseMetals)
-    DataLabel[count++] = (char*) MetalName;
+	} 
+	if (UseMetals)
+	  DataLabel[count++] = (char*) MetalName;
 
-  // S. Selg (08/2019): toggle output of gravitational potential
-  if (WritePotential)
+	// S. Selg (08/2019): toggle output of gravitational potential
+	if (WritePotential)
 	  DataLabel[count++] = (char*) GPotName;
 
-  for (i = 0; i < count; i++)
+	for (i = 0; i < count; i++)
     DataUnits[i] = NULL;
 
-  /* Write parameters to parameter output file */
+	/* Write parameters to parameter output file */
+	
+	if (MyProcessorNumber == ROOT_PROCESSOR) {
+	  fprintf(Outfptr, "DiskNumberOfSpheres    = %"ISYM"\n",
+			  DiskNumberOfSpheres);
+	  fprintf(Outfptr, "DiskRefineAtStart      = %"ISYM"\n",
+			  DiskRefineAtStart);
+	  fprintf(Outfptr, "UseParticles       = %"ISYM"\n",
+			  UseParticles);
+	  fprintf(Outfptr, "UseGas             = %"ISYM"\n",
+			  UseGas);
+	  fprintf(Outfptr, "UseMetals          = %"ISYM"\n",
+			  UseMetals);
+	  fprintf(Outfptr, "InitialTemperature = %"FSYM"\n",
+			  InitialTemperature);
+	  fprintf(Outfptr, "InitialDensity     = %"FSYM"\n",
+			  InitialDensity);
+	  fprintf(Outfptr, "InitialMagnField     = %"FSYM"\n",
+			  InitialMagnField);
+	  for (sphere = 0; sphere < DiskNumberOfSpheres; sphere++) {
+		fprintf(Outfptr, "DiskRadius[%"ISYM"] = %"FSYM"\n", sphere,
+				DiskRadius[sphere]);
+		fprintf(Outfptr, "DiskTemperature[%"ISYM"] = %"FSYM"\n", sphere,
+				DiskTemperature[sphere]);
+		fprintf(Outfptr, "DiskBeta[%"ISYM"] = %"FSYM"\n", sphere,
+				DiskBeta[sphere]);
+		fprintf(Outfptr, "DiskMetallicity[%"ISYM"] = %"FSYM"\n", sphere,
+				DiskMetallicity[sphere]);
+		fprintf(Outfptr, "DiskPosition[%"ISYM"] = ", sphere);
+		WriteListOfFloats(Outfptr, MetaData.TopGridRank,
+						  DiskPosition[sphere]);
+		fprintf(Outfptr, "DiskRotAxis[%"ISYM"] = ", sphere);
+		WriteListOfFloats(Outfptr, MetaData.TopGridRank,
+						  DiskRotAxis[sphere]);
+		fprintf(Outfptr, "DiskVelocity[%"ISYM"] = ", sphere);
+		WriteListOfFloats(Outfptr, MetaData.TopGridRank,
+						  DiskVelocity[sphere]);
+	  }
+	}
+  } // end: if SetBaryonFields
 
-  if (MyProcessorNumber == ROOT_PROCESSOR) {
-    fprintf(Outfptr, "MHDGalaxyDiskNumberOfSpheres    = %"ISYM"\n",
-	    MHDGalaxyDiskNumberOfSpheres);
-    fprintf(Outfptr, "MHDGalaxyDiskRefineAtStart      = %"ISYM"\n",
-	    MHDGalaxyDiskRefineAtStart);
-    fprintf(Outfptr, "MHDGalaxyDiskUseParticles       = %"ISYM"\n",
-	    MHDGalaxyDiskUseParticles);
-    fprintf(Outfptr, "MHDGalaxyDiskUseGas             = %"ISYM"\n",
-	    MHDGalaxyDiskUseGas);
-    fprintf(Outfptr, "MHDGalaxyDiskUseColour          = %"ISYM"\n",
-	    MHDGalaxyDiskUseColour);
-    fprintf(Outfptr, "MHDGalaxyDiskUseMetals          = %"ISYM"\n",
-	    MHDGalaxyDiskUseMetals);
-    fprintf(Outfptr, "MHDGalaxyDiskInitialTemperature = %"FSYM"\n",
-	    MHDGalaxyDiskInitialTemperature);
-    fprintf(Outfptr, "MHDGalaxyDiskInitialDensity     = %"FSYM"\n",
-	    MHDGalaxyDiskInitialDensity);
-    fprintf(Outfptr, "MHDGalaxyDiskUniformVelocity    = %"FSYM" %"FSYM" %"FSYM"\n",
-	    MHDGalaxyDiskUniformVelocity[0], MHDGalaxyDiskUniformVelocity[1],
-	    MHDGalaxyDiskUniformVelocity[2]);
-    for (sphere = 0; sphere < MHDGalaxyDiskNumberOfSpheres; sphere++) {
-      fprintf(Outfptr, "MHDGalaxyDiskType[%"ISYM"] = %"ISYM"\n", sphere,
-	      MHDGalaxyDiskType[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskRadius[%"ISYM"] = %"FSYM"\n", sphere,
-	      MHDGalaxyDiskRadius[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskAngularMomentum[%"ISYM"] = ", sphere);
-      WriteListOfFloats(Outfptr, MetaData.TopGridRank,
-                        MHDGalaxyDiskAngularMomentum[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskCoreRadius[%"ISYM"] = %"GOUTSYM"\n", sphere,
-	      MHDGalaxyDiskCoreRadius[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskDensity[%"ISYM"] = %"FSYM"\n", sphere,
-	      MHDGalaxyDiskDensity[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskTemperature[%"ISYM"] = %"FSYM"\n", sphere,
-	      MHDGalaxyDiskTemperature[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskMetallicity[%"ISYM"] = %"FSYM"\n", sphere,
-	      MHDGalaxyDiskMetallicity[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskPosition[%"ISYM"] = ", sphere);
-      WriteListOfFloats(Outfptr, MetaData.TopGridRank,
-			MHDGalaxyDiskPosition[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskVelocity[%"ISYM"] = ", sphere);
-      WriteListOfFloats(Outfptr, MetaData.TopGridRank,
-			MHDGalaxyDiskVelocity[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskFracKeplerianRot[%"ISYM"] = %"GOUTSYM"\n", sphere,
-              MHDGalaxyDiskFracKeplerianRot[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskTurbulence[%"ISYM"] = %"GOUTSYM"\n", sphere,
-              MHDGalaxyDiskTurbulence[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskCutOff[%"ISYM"] = %"GOUTSYM"\n", sphere,
-              MHDGalaxyDiskCutOff[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskAng1[%"ISYM"] = %"GOUTSYM"\n", sphere,
-              MHDGalaxyDiskAng1[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskAng2[%"ISYM"] = %"GOUTSYM"\n", sphere,
-              MHDGalaxyDiskAng2[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskNumShells[%"ISYM"] = %"ISYM"\n", sphere,
-              MHDGalaxyDiskNumShells[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskConstantPressure[%"ISYM"] = %"ISYM"\n", sphere,
-	      MHDGalaxyDiskConstantPressure[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskSmoothSurface[%"ISYM"] = %"ISYM"\n", sphere,
-	      MHDGalaxyDiskSmoothSurface[sphere]);
-      fprintf(Outfptr, "MHDGalaxyDiskSmoothRadius[%"ISYM"] = %"GOUTSYM"\n", sphere,
-	      MHDGalaxyDiskSmoothRadius[sphere]);
-    }
-  }
-  } // endif SetBaryonFields
   return SUCCESS;
 
 }

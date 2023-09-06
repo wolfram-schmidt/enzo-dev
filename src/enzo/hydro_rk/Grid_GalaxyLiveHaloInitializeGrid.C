@@ -71,10 +71,11 @@ struct galaxy_parameters {
 int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                                        EquilibriumGalaxyDisk DiskTable[MAX_SPHERES],
                                        float SpherePosition[MAX_SPHERES][MAX_DIMENSION],
-                                       float SphereAxisRot[MAX_SPHERES][MAX_DIMENSION],
+                                       float SphereRotAxis[MAX_SPHERES][MAX_DIMENSION],
                                        float SphereVelocity[MAX_SPHERES][MAX_DIMENSION],
                                        float SphereRadius[MAX_SPHERES],
                                        float SphereTemperature[MAX_SPHERES],
+                                       float SphereBeta[MAX_SPHERES],
                                        float SphereMetallicity[MAX_SPHERES], // dummy argument
                                        float InitialTemperature,
                                        float InitialDensity,
@@ -91,18 +92,16 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
     int DeNum, HINum, HIINum, HeINum, HeIINum, HeIIINum, HMNum, H2INum, H2IINum,
         DINum, DIINum, HDINum, MetalNum;
 
-    //float ParticleMeanDensity = FLOAT_UNDEFINED;
-    
     /* create fields */
     
-    int ivel, imag;
+    int ivel, imag, ietot, ieint;
     NumberOfBaryonFields = 0;
 
     if (UseGas) {
       FieldType[NumberOfBaryonFields++] = Density;
-      FieldType[NumberOfBaryonFields++] = TotalEnergy;
+      FieldType[ietot=NumberOfBaryonFields++] = TotalEnergy;
       if (DualEnergyFormalism)
-        FieldType[NumberOfBaryonFields++] = InternalEnergy;
+        FieldType[ieint=NumberOfBaryonFields++] = InternalEnergy;
       ivel = NumberOfBaryonFields;
       FieldType[NumberOfBaryonFields++] = Velocity1;
       if (GridRank > 1) 
@@ -150,6 +149,11 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
     
     if (WritePotential)
         FieldType[NumberOfBaryonFields++] = GravPotential;
+    
+    if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
+      std::cout << "baryon field indizes: ivel=" << ivel << ", imag=" << imag << ", ietot=" << ietot 
+                << ", ieint=" << ieint << ", iBz=" << iBz << ", iPhi=" << iPhi << std::endl;    
+    
 
     /* Return if this doesn't concern us. */
     
@@ -389,7 +393,8 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
       */
 
       float r_max[MAX_SPHERES];
-      float SoundSpeed[MAX_SPHERES];
+      float SoundSpeedIsoth[MAX_SPHERES];
+      float SphereRotNorm[MAX_SPHERES];
       float SphereTransformMatrix[MAX_SPHERES][MAX_DIMENSION][MAX_DIMENSION];
 
       double poisson_coeff = 4*pi*GravConst; // cgs units
@@ -426,51 +431,55 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
       for (sphere = 0; sphere < NumberOfSpheres; sphere++)
       {
-        if (MAX_DIMENSION==3 && !(SphereAxisRot[sphere][2]==0.0 && SphereAxisRot[sphere][1]==0))
-        {
-          double Ang_Vel=sqrt(SphereAxisRot[sphere][0]*SphereAxisRot[sphere][0]
-                              + SphereAxisRot[sphere][1]*SphereAxisRot[sphere][1]
-                              + SphereAxisRot[sphere][2]*SphereAxisRot[sphere][2]);
-          double z_sl[3],x_sl[3];
+        double norm;
+        double z_sl[3], x_sl[3];
+
+        SphereRotNorm[sphere] = sqrt(SphereRotAxis[sphere][0]*SphereRotAxis[sphere][0] +
+                                     SphereRotAxis[sphere][1]*SphereRotAxis[sphere][1] +
+                                     SphereRotAxis[sphere][2]*SphereRotAxis[sphere][2]);
             
-          z_sl[0]=SphereAxisRot[sphere][0]/Ang_Vel;
-          z_sl[1]=SphereAxisRot[sphere][1]/Ang_Vel;
-          z_sl[2]=SphereAxisRot[sphere][2]/Ang_Vel;
+        z_sl[0] = SphereRotAxis[sphere][0]/SphereRotNorm[sphere];
+        z_sl[1] = SphereRotAxis[sphere][1]/SphereRotNorm[sphere];
+        z_sl[2] = SphereRotAxis[sphere][2]/SphereRotNorm[sphere];
             
-          for (int it=0;it<MAX_DIMENSION;it++)
-            SphereAxisRot[sphere][it]/=Ang_Vel;
+        x_sl[0] = 1.0 - z_sl[0];
+        x_sl[1] = -z_sl[0];
+        x_sl[2] = -z_sl[1];
             
-          x_sl[0]=1.0-z_sl[0];
-          x_sl[1]=-z_sl[0];
-          x_sl[2]=-z_sl[1];
-            
-          double temp_norm=sqrt(x_sl[0]*x_sl[0]+x_sl[1]*x_sl[1]+x_sl[2]*x_sl[2]);
-          x_sl[0]/=temp_norm;
-          x_sl[1]/=temp_norm;
-          x_sl[2]/=temp_norm;
+        norm = sqrt(x_sl[0]*x_sl[0] + x_sl[1]*x_sl[1] + x_sl[2]*x_sl[2]);
+
+        x_sl[0] /= norm;
+        x_sl[1] /= norm;
+        x_sl[2] /= norm;
           
-          SphereTransformMatrix[sphere][0][0]=x_sl[0];
-          SphereTransformMatrix[sphere][2][0]=z_sl[0];
-          SphereTransformMatrix[sphere][1][0]=z_sl[1]*x_sl[2]-z_sl[2]*x_sl[1];
+        SphereTransformMatrix[sphere][0][0] = x_sl[0];
+        SphereTransformMatrix[sphere][2][0] = z_sl[0];
+        SphereTransformMatrix[sphere][1][0] = z_sl[1]*x_sl[2] - z_sl[2]*x_sl[1];
             
-          SphereTransformMatrix[sphere][0][1]=x_sl[1];
-          SphereTransformMatrix[sphere][2][1]=z_sl[1];
-          SphereTransformMatrix[sphere][1][1]=z_sl[2]*x_sl[0]-z_sl[0]*x_sl[2];
+        SphereTransformMatrix[sphere][0][1] = x_sl[1];
+        SphereTransformMatrix[sphere][2][1] = z_sl[1];
+        SphereTransformMatrix[sphere][1][1] = z_sl[2]*x_sl[0] - z_sl[0]*x_sl[2];
             
-          SphereTransformMatrix[sphere][0][2]=x_sl[2];
-          SphereTransformMatrix[sphere][2][2]=z_sl[2];
-          SphereTransformMatrix[sphere][1][2]=z_sl[0]*x_sl[1]-z_sl[1]*x_sl[0];
-        }
+        SphereTransformMatrix[sphere][0][2] = x_sl[2];
+        SphereTransformMatrix[sphere][2][2] = z_sl[2];
+        SphereTransformMatrix[sphere][1][2] = z_sl[0]*x_sl[1] - z_sl[1]*x_sl[0];
+
+        if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
+          std::cout << SphereTransformMatrix[sphere][0][0] << ", " << SphereTransformMatrix[sphere][0][1] << ", " << SphereTransformMatrix[sphere][0][2] << "\n" 
+                    << SphereTransformMatrix[sphere][1][0] << ", " << SphereTransformMatrix[sphere][1][1] << ", " << SphereTransformMatrix[sphere][1][2] << "\n" 
+                    << SphereTransformMatrix[sphere][2][0] << ", " << SphereTransformMatrix[sphere][2][1] << ", " << SphereTransformMatrix[sphere][2][2] << std::endl;
 
         r_max[sphere] = SphereRadius[sphere] * kpc_cm/LengthUnits;
         
-        SoundSpeed[sphere] = sqrt(kboltz * SphereTemperature[sphere] / (mu * mh)) 
-                             / VelocityUnits;
+        SoundSpeedIsoth[sphere] = sqrt(kboltz * SphereTemperature[sphere] / (mu * mh)) 
+                                  / VelocityUnits;
         
         if (debug && (MyProcessorNumber == ROOT_PROCESSOR)) {
           printf("GalaxyLiveHalo: sphere radius: %"GSYM" kpc, %"GSYM"\n", SphereRadius[sphere], r_max[sphere]);
           printf("GalaxyLiveHalo: background density: %"GSYM" g/cm^3\n", InitialDensity * DensityUnits);
-          printf("GalaxyLiveHalo: isothermal speed of sound: %"GSYM" cm/s\n", SoundSpeed[sphere] * VelocityUnits);
+          printf("GalaxyLiveHalo: background magnetic field: %"GSYM" G\n", 
+                 sqrt(4 * pi * DensityUnits) * VelocityUnits * InitialMagnField);
+          printf("GalaxyLiveHalo: isothermal speed of sound: %"GSYM" cm/s\n", SoundSpeedIsoth[sphere] * VelocityUnits);
           if (legacy) 
             printf("GalaxyLiveHalo: central disk velocity =  %"GSYM"cm/s\n", test.v_s);
         }
@@ -480,7 +489,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
         if (legacy) 
         {
           Galaxy[sphere] = hydrostatic_disk(test.N_x, test.N_z, test.dx, test.dz, test.r_s, test.z_s, 
-                                            test.sigma, SoundSpeed[sphere] * VelocityUnits);
+                                            test.sigma, SoundSpeedIsoth[sphere] * VelocityUnits);
 
           Galaxy[sphere].set_halo_mass(test.halo_mass);
           Galaxy[sphere].set_halo_scale(test.halo_scale);
@@ -509,13 +518,12 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
       int i, j, k;
       int n = 0;
 
-      float x, y, z;
-      float density, temperature;
-      float Velocity[MAX_DIMENSION], MagnField[MAX_DIMENSION];
-      
-      float r, rcyl, xpos, ypos, zpos;
-      float cosphi, sinphi, sintheta, vphi;
-      float RotVelocity[MAX_DIMENSION];
+      double x, y, z;     
+      double xpos, ypos, zpos;
+      double r, rcyl, xcyl, ycyl, zcyl;
+      double norm, vphi, Bphi;
+      double density, temperature;
+      double Toroidal[MAX_DIMENSION], Velocity[MAX_DIMENSION], MagnField[MAX_DIMENSION];
 
       /*
       if((MyProcessorNumber == ROOT_PROCESSOR))
@@ -535,46 +543,53 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
             temperature = InitialTemperature;
             for (dim = 0; dim < MAX_DIMENSION; dim++) 
             {
-              Velocity[dim] = 0;
-              MagnField[dim] = 0;
+              Velocity[dim] = 0e0;
+              MagnField[dim] = 0e0;
             }
 
             for (sphere = 0; sphere < NumberOfSpheres; sphere++) 
             {
+              // displacement from sphere center
+              xpos = x - SpherePosition[sphere][0];
+              ypos = y - SpherePosition[sphere][1];
+              zpos = z - SpherePosition[sphere][2];
+
               // radial distance from center
-              r = sqrt(pow(fabs(x-SpherePosition[sphere][0]), 2) +
-                       pow(fabs(y-SpherePosition[sphere][1]), 2) +
-                       pow(fabs(z-SpherePosition[sphere][2]), 2) );
+              r = sqrt(pow(fabs(xpos), 2) + pow(fabs(ypos), 2) + pow(fabs(zpos), 2));
               r = max(r, 0.1*CellWidth[0][0]);
         
               if (r < r_max[sphere]) 
-              {
-                xpos = x - SpherePosition[sphere][0];
-                ypos = y - SpherePosition[sphere][1];
-                zpos = z - SpherePosition[sphere][2];
-          
+              {          
+                /* Transform to disk coordinate system (Cartesian/cylindrical). */
+
+                xcyl = xpos*SphereTransformMatrix[sphere][0][0] +
+                       ypos*SphereTransformMatrix[sphere][0][1] +
+                       zpos*SphereTransformMatrix[sphere][0][2];
+                  
+                ycyl = xpos*SphereTransformMatrix[sphere][1][0] +
+                       ypos*SphereTransformMatrix[sphere][1][1] +
+                       zpos*SphereTransformMatrix[sphere][1][2];
+                  
+                zcyl = xpos*SphereTransformMatrix[sphere][2][0] +
+                       ypos*SphereTransformMatrix[sphere][2][1] +
+                       zpos*SphereTransformMatrix[sphere][2][2];
+
                 // radial coordinate in central plane of the disk
-                rcyl = sqrt(xpos*xpos + ypos*ypos);
+                rcyl = sqrt(xcyl*xcyl + ycyl*ycyl);
 
-                // azimuthal angle
-                cosphi = xpos/sqrt(xpos*xpos + ypos*ypos);
-                sinphi = ypos/sqrt(xpos*xpos + ypos*ypos);
+                /* Interpolate disk data. */
 
-                // polar angle
-                sintheta = sqrt(xpos*xpos + ypos*ypos)/sqrt(xpos*xpos + ypos*ypos + zpos*zpos);
-
-                // interpolate disk data
                 if (legacy)
                 {
                   double v_g_sqr, v_p_sqr, v_dm_sqr;
                   double r_n = 0.5*rcyl*LengthUnits / (test.r_s); // normalized radial coordinate
-              
+
                   density = max(InitialDensity,
-                                Galaxy[sphere].intpl_rho(rcyl*LengthUnits, fabs(zpos)*LengthUnits) / DensityUnits);
+                                Galaxy[sphere].intpl_rho(rcyl*LengthUnits, fabs(zcyl)*LengthUnits) / DensityUnits);
             
                   v_g_sqr  = pow(test.v_s * r_n, 2) * (BESSI0(r_n) * BESSK0(r_n) - BESSI1(r_n) * BESSK1(r_n)) 
                              / (VelocityUnits*VelocityUnits);
-                  v_p_sqr  = Galaxy[sphere].intpl_v_sqr(rcyl*LengthUnits, fabs(zpos)*LengthUnits) 
+                  v_p_sqr  = Galaxy[sphere].intpl_v_sqr(rcyl*LengthUnits, fabs(zcyl)*LengthUnits) 
                              / (VelocityUnits*VelocityUnits);
                   v_dm_sqr = Galaxy[sphere].halo_vel_sqr(rcyl*LengthUnits, 0.0)
                              / (VelocityUnits*VelocityUnits);
@@ -582,7 +597,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                   vphi = sqrt(fmax(0.0, v_g_sqr + v_p_sqr + v_dm_sqr));
 
                   /*
-                  if (debug && fabs(ypos) <= CellWidth[1][j] && fabs(zpos) <= CellWidth[2][k])
+                  if (debug && fabs(ycyl) <= CellWidth[1][j] && fabs(zcyl) <= CellWidth[2][k])
                   {
                     printf("r_n = %"GSYM": v_g_sqr =  %"GSYM", v_p_sqr =  %"GSYM", v_dm_sqr =  %"GSYM", vphi = %"GSYM"\n", 
                            2*r_n, v_g_sqr * VelocityUnits*VelocityUnits, v_p_sqr * VelocityUnits*VelocityUnits, 
@@ -593,20 +608,32 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                 else 
                 {
                   density = max(InitialDensity,
-                                DiskTable[sphere].InterpolateEquilibriumDensityTable(rcyl*LengthUnits, zpos*LengthUnits) / DensityUnits);
+                                DiskTable[sphere].InterpolateEquilibriumDensityTable(rcyl*LengthUnits, zcyl*LengthUnits) / DensityUnits);
 
-                  vphi = DiskTable[sphere].InterpolateEquilibriumVcircTable(rcyl*LengthUnits, zpos*LengthUnits) / VelocityUnits;
+                  vphi = DiskTable[sphere].InterpolateEquilibriumVcircTable(rcyl*LengthUnits, zcyl*LengthUnits) / VelocityUnits;
                 }
 
-                //vphi *= (1.0 - (1.0 - exp(SmoothFactor*r/r_max[sphere]))/(1.0 - exp(SmoothFactor)));
+                /* cross product of unit vectors along rotation axis and in radial direction */
 
-                RotVelocity[0] = -vphi*sinphi*sintheta;
-                RotVelocity[1] = vphi*cosphi*sintheta;
-                RotVelocity[2] = 0;
+                norm = SphereRotNorm[sphere]*r;
 
-                Velocity[0] = RotVelocity[0] + SphereVelocity[sphere][0];
-                Velocity[1] = RotVelocity[1] + SphereVelocity[sphere][1];
-                Velocity[2] = RotVelocity[2] + SphereVelocity[sphere][2];
+                Toroidal[0] = (SphereRotAxis[sphere][1]*zpos - SphereRotAxis[sphere][2]*ypos)/norm;
+                Toroidal[1] = (SphereRotAxis[sphere][2]*xpos - SphereRotAxis[sphere][0]*zpos)/norm;
+                Toroidal[2] = (SphereRotAxis[sphere][0]*ypos - SphereRotAxis[sphere][1]*xpos)/norm;
+
+                /* rotation velocity plus center-of-mass velocity */
+
+                Velocity[0] = vphi*Toroidal[0] + SphereVelocity[sphere][0];
+                Velocity[1] = vphi*Toroidal[1] + SphereVelocity[sphere][1];
+                Velocity[2] = vphi*Toroidal[2] + SphereVelocity[sphere][2];
+
+                /* toroidal magnetic field */
+
+                Bphi = sqrt(2 * density / SphereBeta[sphere]) * SoundSpeedIsoth[sphere];
+
+                MagnField[0] = Bphi*Toroidal[0];
+                MagnField[1] = Bphi*Toroidal[1];
+                MagnField[2] = Bphi*Toroidal[2];
               }
             } // END FOR sphere
 
@@ -661,32 +688,38 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
               BaryonField[H2INum][n];
               }
             } // END IF MultiSpecies
-    
+
             /* Set Velocities. */
     
             for (int dim = 0; dim < GridRank; dim++)
-            {
               BaryonField[ivel+dim][n] = Velocity[dim];
-              if (HydroMethod == MHD_RK)
-                BaryonField[imag+dim][n] = MagnField[dim];
-            }
-            if (HydroMethod == MHD_RK)
-              BaryonField[imag+GridRank][n] = 0.0;//1.0e-30;
         
-            /* Set energy (thermal and then total if necessary). */
-        
-            BaryonField[1][n] = temperature/TemperatureUnits/ ((Gamma-1.0)*mu);
-        
+            /* Set energy (thermal and then total if necessary) and magnetic field. */
+      
+            BaryonField[ietot][n] = temperature/TemperatureUnits / ((Gamma-1.0)*mu);
+
             if (DualEnergyFormalism)
-              BaryonField[2][n] = BaryonField[1][n];
-    
-            if (HydroMethod != Zeus_Hydro)
-              for (int dim = 0; dim < GridRank; dim++)
-              {
-                BaryonField[1][n] += 0.5*pow(BaryonField[ivel+dim][n], 2);
-                if (HydroMethod == MHD_RK)
-                  BaryonField[1][n] += 0.5*pow(BaryonField[imag+dim][n], 2)/BaryonField[0][n];
+              BaryonField[ieint][n] = BaryonField[ietot][n];
+
+            for (dim = 0; dim < GridRank; dim++)
+              BaryonField[ietot][n] += 0.5*pow(BaryonField[ivel+dim][n], 2);
+            
+            if (HydroMethod == MHD_RK) {
+
+              // initialize uniform field in z-direction
+
+              BaryonField[iBx][n] = 0.0;
+              BaryonField[iBy][n] = 0.0;
+              BaryonField[iBz][n] = InitialMagnField;
+              BaryonField[iPhi][n] = 0.0;
+
+              // add toroidal field and update total energy
+
+              for (int dim = 0; dim < GridRank; dim++) {
+                BaryonField[imag+dim][n] += MagnField[dim];
+                BaryonField[ietot][n] += 0.5*pow(BaryonField[imag+dim][n], 2)/BaryonField[0][n];
               }
+            }
           } // END loop over grid
     } // END FOR UseGas
         
