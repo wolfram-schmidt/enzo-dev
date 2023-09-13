@@ -36,7 +36,7 @@ int RebuildHierarchy(TopGridData *MetaData,
 // discrimination between the states of ``SetBaryonFiels``.
 // ----------------------------------------------------------------------------
 
-int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr, 
+int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 			  HierarchyEntry &TopGrid, TopGridData &MetaData,
 			  int SetBaryonFields
 		)
@@ -47,14 +47,14 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
   const char *Vel1Name = "x-velocity";
   const char *Vel2Name = "y-velocity";
   const char *Vel3Name = "z-velocity";
-  
+
   // S. Selg (08/2019): Gravitational Potential (for output)
-  const char *GPotName          = "Grav_Potential";  
+  const char *GPotName          = "Grav_Potential";
   const char *Bfield1Name	= "Bx";
   const char *Bfield2Name	= "By";
   const char *Bfield3Name	= "Bz";
   const char *PhiName		= "Phi";
-	
+
   const char *ColourName = "colour";
   const char *ElectronName = "Electron_Density";
   const char *HIName    = "HI_Density";
@@ -93,7 +93,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
         DiskMetallicity[MAX_SPHERES];
 
   float DiskPosition[MAX_SPHERES][MAX_DIMENSION],
-	    DiskRotAxis[MAX_SPHERES][MAX_DIMENSION], 
+	    DiskRotAxis[MAX_SPHERES][MAX_DIMENSION],
         DiskVelocity[MAX_SPHERES][MAX_DIMENSION];
 
   EquilibriumGalaxyDisk DiskTable[MAX_SPHERES];
@@ -123,15 +123,15 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 
     ret += sscanf(line, "DiskNumberOfSpheres = %"ISYM,
 				  &DiskNumberOfSpheres);
-    ret += sscanf(line, "DiskRefineAtStart = %"ISYM, 
+    ret += sscanf(line, "DiskRefineAtStart = %"ISYM,
 				  &DiskRefineAtStart);
-    ret += sscanf(line, "UseParticles = %"ISYM, 
+    ret += sscanf(line, "UseParticles = %"ISYM,
 				  &UseParticles);
-    ret += sscanf(line, "UseGas = %"ISYM, 
+    ret += sscanf(line, "UseGas = %"ISYM,
 				  &UseGas);
-    ret += sscanf(line, "UseMetals = %"ISYM, 
+    ret += sscanf(line, "UseMetals = %"ISYM,
 				  &UseMetals);
-    ret += sscanf(line, "InitialTemperature = %"FSYM, 
+    ret += sscanf(line, "InitialTemperature = %"FSYM,
 				  &InitialTemperature);
     ret += sscanf(line, "InitialDensity = %"FSYM,
 				  &InitialDensity);
@@ -150,31 +150,34 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
       	ret += sscanf(line, "DiskRadius[%"ISYM"] = %"FSYM, &sphere,
 					  &DiskRadius[sphere]);
     if (sscanf(line, "DiskPosition[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "DiskPosition[%"ISYM"] = %"PSYM" %"PSYM" %"PSYM, 
-					  &sphere, 
+      	ret += sscanf(line, "DiskPosition[%"ISYM"] = %"PSYM" %"PSYM" %"PSYM,
+					  &sphere,
 					  &DiskPosition[sphere][0],
 					  &DiskPosition[sphere][1],
 					  &DiskPosition[sphere][2]);
     if (sscanf(line, "DiskRotAxis[%"ISYM"]", &sphere) > 0)
       	ret += sscanf(line, "DiskRotAxis[%"ISYM"] = %"PSYM" %"PSYM" %"PSYM,
-					  &sphere, 
+					  &sphere,
 					  &DiskRotAxis[sphere][0],
 					  &DiskRotAxis[sphere][1],
 					  &DiskRotAxis[sphere][2]);
     if (sscanf(line, "DiskVelocity[%"ISYM"]", &sphere) > 0)
-      	ret += sscanf(line, "DiskVelocity[%"ISYM"] = %"FSYM" %"FSYM" %"FSYM, 
-					  &sphere, 
+      	ret += sscanf(line, "DiskVelocity[%"ISYM"] = %"FSYM" %"FSYM" %"FSYM,
+					  &sphere,
 					  &DiskVelocity[sphere][0],
 					  &DiskVelocity[sphere][1],
 					  &DiskVelocity[sphere][2]);
 
     /* if the line is suspicious, issue a warning */
 
-    if (ret == 0 && strstr(line, "=") && strstr(line, "Disk") 
+    if (ret == 0 && strstr(line, "=") && strstr(line, "Disk")
 	    && line[0] != '#' && MyProcessorNumber == ROOT_PROCESSOR)
       fprintf(stderr, "warning: the following parameter line was not interpreted:\n%s\n", line);
 
   } // end input from parameter file
+
+  if (debug && MyProcessorNumber == ROOT_PROCESSOR)
+	printf("Using metals: %"ISYM"\n", UseMetals);
 
   for (sphere = 0; sphere < DiskNumberOfSpheres; sphere++)
     DiskTable[sphere].ReadInData("disk-hernq.dat");
@@ -206,6 +209,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 					InitialMagnField,
 					UseParticles,
 					UseGas,
+					UseMetals,
 					0,
 					SetBaryonFields,
 					1) == FAIL) {
@@ -230,7 +234,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 			float(MetaData.TopGridDims[dim]);
 	  }
 
-	/* (S. Selg, 10/2019) The following lines use the code from ClusterInitialize and are to 
+	/* (S. Selg, 10/2019) The following lines use the code from ClusterInitialize and are to
 	   implement a refinement at start. If requested, refine the grids to the desired level. */
 
 	if (DiskRefineAtStart) {
@@ -240,8 +244,8 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 		  LevelArray[level] = NULL;
 	  AddLevel(LevelArray, &TopGrid, 0);
 	  // Add levels to the maximum depth until no new levels are created,
-	  // and re-initialize the level after it's created. 
-	  for (level = 0; level < MaximumRefinementLevel; level++) 
+	  // and re-initialize the level after it's created.
+	  for (level = 0; level < MaximumRefinementLevel; level++)
 	  {
 		  if (RebuildHierarchy(&MetaData, LevelArray, level) == FAIL)
 		  {
@@ -268,9 +272,10 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 				InitialMagnField,
 				UseParticles,
 				UseGas,
+				UseMetals,
 				level,   // S. Selg (11/2019, used to be level+1)
 				SetBaryonFields,
-				0) == FAIL) 
+				0) == FAIL)
 				{
 					fprintf(stderr, "Error in GalaxyLiveHaloInitializeGrid.\n");
 					return FAIL;
@@ -286,7 +291,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 		  while (Temp != NULL)
 		  {
 			  if (Temp->GridData->ProjectSolutionToParentGrid(
-				*LevelArray[level-1]->GridData) == FAIL)		  
+				*LevelArray[level-1]->GridData) == FAIL)
 			  {
 				  fprintf(stderr, "Error in grid->ProjectSolutionToParentGrid.\n");
 				  return FAIL;
@@ -297,18 +302,18 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
     } // end: if (DiskRefineAtStart)
 
 	/* set up field names and units */
-	
+
 	int count = 0;
 	DataLabel[count++] = (char*) DensName;
 	DataLabel[count++] = (char*) TEName;
-	
+
 	if (DualEnergyFormalism)
 		DataLabel[count++] = (char*) GEName;
-	
+
 	DataLabel[count++] = (char*) Vel1Name;
 	DataLabel[count++] = (char*) Vel2Name;
 	DataLabel[count++] = (char*) Vel3Name;
-	
+
 	if(HydroMethod == MHD_RK)
 	{
 		DataLabel[count++] = (char*) Bfield1Name;
@@ -336,7 +341,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 			DataLabel[count++] = (char*) DIIName;
 			DataLabel[count++] = (char*) HDIName;
 		}
-	} 
+	}
 	if (UseMetals)
 	  DataLabel[count++] = (char*) MetalName;
 
@@ -348,7 +353,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
     DataUnits[i] = NULL;
 
 	/* Write parameters to parameter output file */
-	
+
 	if (MyProcessorNumber == ROOT_PROCESSOR) {
 	  fprintf(Outfptr, "DiskNumberOfSpheres    = %"ISYM"\n",
 			  DiskNumberOfSpheres);

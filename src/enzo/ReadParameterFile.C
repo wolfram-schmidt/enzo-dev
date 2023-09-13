@@ -1469,9 +1469,17 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
     if (strstr(line, "MHDDRF")              ) ret++;
     if (strstr(line, "DrivenFlowMach")      ) ret++;
     if (strstr(line, "DrivenFlowMagField")  ) ret++;
-    if (strstr(line, "DrivenFlowDensity")      ) ret++;
-    if (strstr(line, "DrivenFlowPressure")      ) ret++;
-
+    if (strstr(line, "DrivenFlowDensity")   ) ret++;
+    if (strstr(line, "DrivenFlowPressure")  ) ret++;
+    if (strstr(line, "Disk")                ) ret++;
+    if (strstr(line, "Halo")                ) ret++;
+    if (strstr(line, "UseParticles")        ) ret++;
+    if (strstr(line, "UseGas")              ) ret++;
+    if (strstr(line, "UseMetals")           ) ret++;
+    if (strstr(line, "InitialTemperature")  ) ret++;
+    if (strstr(line, "InitialDensity")      ) ret++;
+    if (strstr(line, "InitialMagnField")    ) ret++;
+    
     if (strstr(line, "\"\"\"")              ) comment_count++;
 
     /* if the line is suspicious, issue a warning */

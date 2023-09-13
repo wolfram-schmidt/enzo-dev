@@ -43,7 +43,7 @@ double BESSK1(double y);
 
 /*******************************************************/
 
-static float CosmologySimulationOmegaBaryonNow       = 0.0463;
+static float MetallicityFloor = 1e-12;
 static float CosmologySimulationInitialFractionHII   = 1.2e-5;
 static float CosmologySimulationInitialFractionHeII  = 1.0e-14;
 static float CosmologySimulationInitialFractionHeIII = 1.0e-17;
@@ -76,12 +76,13 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                                        float SphereRadius[MAX_SPHERES],
                                        float SphereTemperature[MAX_SPHERES],
                                        float SphereBeta[MAX_SPHERES],
-                                       float SphereMetallicity[MAX_SPHERES], // dummy argument
+                                       float SphereMetallicity[MAX_SPHERES],
                                        float InitialTemperature,
                                        float InitialDensity,
                                        float InitialMagnField,
                                        int UseParticles,
                                        int UseGas,
+                                       int UseMetals,
                                        int level,
                                        int SetBaryonFields,
                                        int partitioned)
@@ -141,6 +142,17 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
       }
     }
 
+    if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
+        std::cout << "UseMetals=" << UseMetals << std::endl;    
+  
+    if (UseMetals)
+    {
+      MetalNum = NumberOfBaryonFields;
+      FieldType[NumberOfBaryonFields++] = Metallicity;
+      if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
+        std::cout << "using metals, MetalNum=" << MetalNum << " " << NumberOfBaryonFields << std::endl;    
+    }
+
     int phip_num;
     if (UsePoissonDivergenceCleaning){
         FieldType[phip_num=NumberOfBaryonFields++] = Phi_pField;
@@ -152,7 +164,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
     
     if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
       std::cout << "baryon field indizes: ivel=" << ivel << ", imag=" << imag << ", ietot=" << ietot 
-                << ", ieint=" << ieint << ", iBz=" << iBz << ", iPhi=" << iPhi << std::endl;    
+                << ", ieint=" << ieint << ", iBz=" << iBz << ", iPhi=" << iPhi << ", MetalNum=" << MetalNum << std::endl;    
     
 
     /* Return if this doesn't concern us. */
@@ -344,54 +356,8 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
     } // END IF UseParticles
 
-    /* Set densities */
-    
-    /*  
-    float BaryonMeanDensity, ParticleCount = 0;
-    switch (UseParticles)
-    {
-        case 1:
-            BaryonMeanDensity = CosmologySimulationOmegaBaryonNow / OmegaMatterNow;
-            break;
-        case 2:
-            BaryonMeanDensity = 1 - CosmologySimulationOmegaBaryonNow / OmegaMatterNow;
-            break;
-        default:
-            BaryonMeanDensity = 1.0;
-    } // ENDSWITCH UseParticles
-
-    BaryonMeanDensity = 1.0;
-    
-    if (ParticleMeanDensity == FLOAT_UNDEFINED)
-        ParticleMeanDensity = 1.0 - BaryonMeanDensity;
-    else
-       BaryonMeanDensity = 1.0 - ParticleMeanDensity; 
-    */
-    
-    /* Set up the baryon field. */
-    
-    /* compute size of fields
-    
-    size = 1;
-    for (int dim = 0; dim < GridRank; dim++)
-        size *= GridDimension[dim];
-    */
-
     if (UseGas) 
-    {        
-      /* compute size of fields 
-    
-      size = 1;
-      for (int dim = 0; dim < GridRank; dim++)
-        size *= GridDimension[dim];
-
-      allocate fields 
-      
-      for (field = 0; field < NumberOfBaryonFields; field++)
-        if (BaryonField[field] == NULL)
-            BaryonField[field] = new float[size]; 
-      */
-
+    {
       float r_max[MAX_SPHERES];
       float SoundSpeedIsoth[MAX_SPHERES];
       float SphereRotNorm[MAX_SPHERES];
@@ -522,7 +488,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
       double xpos, ypos, zpos;
       double r, rcyl, xcyl, ycyl, zcyl;
       double norm, vphi, Bphi;
-      double density, temperature;
+      double density, temperature, metallicity;
       double Toroidal[MAX_DIMENSION], Velocity[MAX_DIMENSION], MagnField[MAX_DIMENSION];
 
       /*
@@ -541,6 +507,8 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
             density = InitialDensity;
             temperature = InitialTemperature;
+            metallicity = MetallicityFloor;
+            
             for (dim = 0; dim < MAX_DIMENSION; dim++) 
             {
               Velocity[dim] = 0e0;
@@ -634,7 +602,10 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                 MagnField[0] = Bphi*Toroidal[0];
                 MagnField[1] = Bphi*Toroidal[1];
                 MagnField[2] = Bphi*Toroidal[2];
-              }
+
+                metallicity = (density > InitialDensity) ? SphereMetallicity[sphere] : MetallicityFloor;
+
+              } // END IF inside sphere
             } // END FOR sphere
 
             /* Set density. */
@@ -688,6 +659,9 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
               BaryonField[H2INum][n];
               }
             } // END IF MultiSpecies
+
+            if (UseMetals)
+	            BaryonField[MetalNum][n] = metallicity*density;
 
             /* Set Velocities. */
     

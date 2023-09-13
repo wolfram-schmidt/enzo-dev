@@ -3144,6 +3144,7 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
 				   float InitialMagnField,
 				   int UseParticles,
 				   int UseGas,
+				   int UseMetals,
 				   int level,
 				   int SetBaryonFields,
 				   int partitioned);
