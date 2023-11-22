@@ -2,12 +2,15 @@
 /
 /  INITIALIZE DISK GALAXIES WITH LIVE HALOS
 /
-/  written by: Kai Rodenbeck and Simon Selg
+/  written by: Simon Selg and Wolfram Schmidt 
+/              (based on code by Kai Rodenbeck)
 /  date:       July, 2020
-/  modified:   August, 2023
+/  modified:   October, 2023
 /
 /  PURPOSE:
 /    Sets up one or more disk galaxies and particle halos.
+/    Use https://github.com/wolfram-schmidt/isolated-galaxy 
+/    or equivalent tool to generate initial conditions.
 /
 ************************************************************************/
 
@@ -29,17 +32,11 @@ void WriteListOfFloats(FILE *fptr, int N, float floats[]);
 void WriteListOfFloats(FILE *fptr, int N, FLOAT floats[]);
 void AddLevel(LevelHierarchyEntry *Array[], HierarchyEntry *Grid, int level);
 int RebuildHierarchy(TopGridData *MetaData,
-		     LevelHierarchyEntry *LevelArray[], int level);
-
-// ============================================================================
-// S. Selg (11/2019): Adjustments in order to use PRGIO. Mind that there is a
-// discrimination between the states of ``SetBaryonFiels``.
-// ----------------------------------------------------------------------------
+                     LevelHierarchyEntry *LevelArray[], int level);
 
 int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 			  HierarchyEntry &TopGrid, TopGridData &MetaData,
-			  int SetBaryonFields
-		)
+			  int SetBaryonFields)
 {
   const char *DensName = "Density";
   const char *TEName   = "TotalEnergy";
@@ -47,9 +44,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
   const char *Vel1Name = "x-velocity";
   const char *Vel2Name = "y-velocity";
   const char *Vel3Name = "z-velocity";
-
-  // S. Selg (08/2019): Gravitational Potential (for output)
-  const char *GPotName          = "Grav_Potential";
+  const char *GPotName       = "Grav_Potential";
   const char *Bfield1Name	= "Bx";
   const char *Bfield2Name	= "By";
   const char *Bfield3Name	= "Bz";
@@ -75,13 +70,16 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
   char  line[MAX_LINE_LENGTH];
   int   dim, ret, level, sphere, i;
 
+  char *dummy = new char[MAX_LINE_LENGTH];
+  dummy[0] = 0;
+
   /* set default parameters */
 
-  int DiskNumberOfSpheres = 1;
-  int DiskRefineAtStart   = TRUE;
-  int UseParticles    = TRUE;
-  int UseGas          = TRUE;
-  int UseMetals       = FALSE;
+  int NumberOfHalos = 1;
+  int DiskRefineAtStart = TRUE;
+  int UseParticles  = TRUE;
+  int UseGas        = TRUE;
+  int UseMetals     = FALSE;
 
   float InitialTemperature = 1e4;  // 10.000 K
   float InitialDensity     = 1e-3; // in code units
@@ -95,6 +93,9 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
   float DiskPosition[MAX_SPHERES][MAX_DIMENSION],
 	    DiskRotAxis[MAX_SPHERES][MAX_DIMENSION],
         DiskVelocity[MAX_SPHERES][MAX_DIMENSION];
+
+  char* DiskDataFile[MAX_SPHERES];
+  char* HaloDataFile[MAX_SPHERES];
 
   EquilibriumGalaxyDisk DiskTable[MAX_SPHERES];
 
@@ -121,8 +122,8 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 
     /* read parameters */
 
-    ret += sscanf(line, "DiskNumberOfSpheres = %"ISYM,
-				  &DiskNumberOfSpheres);
+    ret += sscanf(line, "NumberOfHalos = %"ISYM,
+				  &NumberOfHalos);
     ret += sscanf(line, "DiskRefineAtStart = %"ISYM,
 				  &DiskRefineAtStart);
     ret += sscanf(line, "UseParticles = %"ISYM,
@@ -167,6 +168,30 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 					  &DiskVelocity[sphere][0],
 					  &DiskVelocity[sphere][1],
 					  &DiskVelocity[sphere][2]);
+	if (sscanf(line, "DiskDataFile[%"ISYM"]", &sphere) > 0)
+	  if (sscanf(line, "DiskDataFile[%"ISYM"] = %s", &sphere, dummy) == 2) {
+		if (sphere >= MAX_SPHERES)
+          ENZO_VFAIL("Error in GalaxyLiveHaloInitialize: DiskDataFile %"ISYM" > maximum allowed.", sphere);
+		DiskDataFile[sphere] = new char[strlen(dummy) + 1];
+	  	strcpy(DiskDataFile[sphere], dummy);
+	    ret++;
+      }
+	if (sscanf(line, "HaloDataFile[%"ISYM"]", &sphere) > 0)
+	  if (sscanf(line, "HaloDataFile[%"ISYM"] = %s", &sphere, dummy) == 2) {
+		if (sphere >= MAX_SPHERES)
+          ENZO_VFAIL("Error in GalaxyLiveHaloInitialize: HaloDataFile %"ISYM" > maximum allowed.", sphere);
+		HaloDataFile[sphere] = new char[strlen(dummy) + 1];
+	  	strcpy(HaloDataFile[sphere], dummy);
+	    ret++;
+      }
+
+	/* If the dummy char space was used, then make another. */
+
+    if (*dummy != 0) {
+      dummy = new char[MAX_LINE_LENGTH];
+      dummy[0] = 0;
+      ret++;
+    }
 
     /* if the line is suspicious, issue a warning */
 
@@ -176,26 +201,38 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 
   } // end input from parameter file
 
-  if (debug && MyProcessorNumber == ROOT_PROCESSOR)
-	printf("Using metals: %"ISYM"\n", UseMetals);
+  /* clean up */
 
-  for (sphere = 0; sphere < DiskNumberOfSpheres; sphere++)
-    DiskTable[sphere].ReadInData("disk-hernq.dat");
+  delete [] dummy;
+
+  /* check if file names are defined and read initial conditions for disks from files */	
+
+  for (sphere = 0; sphere < NumberOfHalos; sphere++) {
+	if (DiskDataFile[sphere] == NULL)
+	  ENZO_VFAIL("Error in GalaxyLiveHaloInitialize: DiskDataFile[%"ISYM"] undefined.", sphere);
+	if (HaloDataFile[sphere] == NULL)
+	  ENZO_VFAIL("Error in GalaxyLiveHaloInitialize: HaloDataFile[%"ISYM"] undefined.", sphere);
+	if (debug && MyProcessorNumber == ROOT_PROCESSOR)
+	  printf("GalaxyLiveHalo, sphere %"ISYM": data files %s, %s\n", sphere, DiskDataFile[sphere], HaloDataFile[sphere]);
+
+    DiskTable[sphere].ReadInData(DiskDataFile[sphere]);
+  }
 
   /* set up grid */
-
   /* =========================================================================
-   * S. Selg (11/2019): Implementation of Parallel Root Grid IO (PRGIO)
-   * =========================================================================
+   * Implementation of Parallel Root Grid IO (PRGIO).
+   * Mind the different states of SetBaryonFiels.
+   * 
+   * TOP GRID PRECOMPUTING
    */
-  // A bit of pre-computing
-  // TOP GRID SPACING
+ 
   float TopGridSpacing = float(MetaData.TopGridDims[0]);
-  HierarchyEntry *CurrentGrid;
+  HierarchyEntry *CurrentGrid;  
   CurrentGrid = &TopGrid;
   while (CurrentGrid != NULL) {
   	if (CurrentGrid->GridData->GalaxyLiveHaloInitializeGrid(
-					DiskNumberOfSpheres,
+					NumberOfHalos,
+					HaloDataFile,
 					DiskTable,
 					DiskPosition,
 					DiskRotAxis,
@@ -218,8 +255,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 	CurrentGrid = CurrentGrid->NextGridThisLevel;
   }
 
-  /* S. Selg (11/2019): This will be done after first initialization! (if you are
-   * using prgio. */
+  /* AFTER FIRST INITIALIZATION (IF USING PRGIO). */
 
   if (SetBaryonFields) {
 
@@ -234,7 +270,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 			float(MetaData.TopGridDims[dim]);
 	  }
 
-	/* (S. Selg, 10/2019) The following lines use the code from ClusterInitialize and are to
+	/* The following lines use the code from ClusterInitialize and are to
 	   implement a refinement at start. If requested, refine the grids to the desired level. */
 
 	if (DiskRefineAtStart) {
@@ -258,7 +294,8 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 		  while (Temp != NULL)
 		  {
 			  if (Temp->GridData->GalaxyLiveHaloInitializeGrid(
-				DiskNumberOfSpheres,
+				NumberOfHalos,
+				HaloDataFile,
 				DiskTable,
 				DiskPosition,
 				DiskRotAxis,
@@ -273,7 +310,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 				UseParticles,
 				UseGas,
 				UseMetals,
-				level,   // S. Selg (11/2019, used to be level+1)
+				level, // used to be level+1
 				SetBaryonFields,
 				0) == FAIL)
 				{
@@ -345,7 +382,6 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 	if (UseMetals)
 	  DataLabel[count++] = (char*) MetalName;
 
-	// S. Selg (08/2019): toggle output of gravitational potential
 	if (WritePotential)
 	  DataLabel[count++] = (char*) GPotName;
 
@@ -355,8 +391,8 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 	/* Write parameters to parameter output file */
 
 	if (MyProcessorNumber == ROOT_PROCESSOR) {
-	  fprintf(Outfptr, "DiskNumberOfSpheres    = %"ISYM"\n",
-			  DiskNumberOfSpheres);
+	  fprintf(Outfptr, "NumberOfHalos    = %"ISYM"\n",
+			  NumberOfHalos);
 	  fprintf(Outfptr, "DiskRefineAtStart      = %"ISYM"\n",
 			  DiskRefineAtStart);
 	  fprintf(Outfptr, "UseParticles       = %"ISYM"\n",
@@ -371,7 +407,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 			  InitialDensity);
 	  fprintf(Outfptr, "InitialMagnField     = %"FSYM"\n",
 			  InitialMagnField);
-	  for (sphere = 0; sphere < DiskNumberOfSpheres; sphere++) {
+	  for (sphere = 0; sphere < NumberOfHalos; sphere++) {
 		fprintf(Outfptr, "DiskRadius[%"ISYM"] = %"FSYM"\n", sphere,
 				DiskRadius[sphere]);
 		fprintf(Outfptr, "DiskTemperature[%"ISYM"] = %"FSYM"\n", sphere,

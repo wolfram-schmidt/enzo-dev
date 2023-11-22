@@ -7,13 +7,14 @@
  *  modified1:
  *
  *  PURPOSE: reads and interpolates data for disk galaxies
+ *           size of table limited by MAX_DISK_ZONES
  *
  **************************************************************************/
 
 #ifndef EQUILIBRIUM_GALAXY_DISK_DEFINED__
 #define EQUILIBRIUM_GALAXY_DISK_DEFINED__
 
-#define MAX_DISK_ZONES 250
+#define MAX_DISK_ZONES 500
 
 #include "macros_and_parameters.h"
 #include "typedefs.h"
@@ -39,11 +40,6 @@ class EquilibriumGalaxyDisk {
     gas_disk_nr = 0;
     gas_disk_nz = 0;
   };
-
-  //
-  // Destructor
-  //
-  //~EquilibriumGalaxyDisk();
 
   // 
   // read in data file

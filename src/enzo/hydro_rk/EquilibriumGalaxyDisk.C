@@ -6,9 +6,8 @@
 /  date:       June 2023
 /  modified1:  
 /
-/  PURPOSE:
-/
-/  RETURNS:
+/  PURPOSE: reads and interpolates data for disk galaxies
+/           size of table limited by MAX_DISK_ZONES
 /
 ************************************************************************/
 
@@ -39,16 +38,17 @@ void EquilibriumGalaxyDisk::ReadInData(char *fname)
 
   int i = 0; 
   int j = 0;
+  int n = 0; // used for debugging output below
 
   if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
-    printf("ReadInData: table\n");
+    printf("ReadInData: %s\n", fname);
 
   while(inFile >> r >> z >> rho >> vcirc)
   {
     if (r > r_prev) {
       // record radial zones if midplane (z = 0)
       if (j == 0)
-	this->gas_disk_zones_r[i] = r * pc_cm;
+	      this->gas_disk_zones_r[i] = r * pc_cm;
     } else {
       this->gas_disk_nr = i;
       // next vertical zone
@@ -58,21 +58,26 @@ void EquilibriumGalaxyDisk::ReadInData(char *fname)
 
     this->gas_disk_log_rho[i][j] = log(1e-3*rho); // SI to cgs
     this->gas_disk_vcirc[i][j] = 1e2*vcirc; // SI to cgs
-    /*
-    if (debug && (MyProcessorNumber == ROOT_PROCESSOR)) 
-      printf("i=%d, r=%f, j=%d, z=%f, %f, %e\n",
-	     i, this->gas_disk_zones_r[i], j, z, this->gas_disk_log_rho[i][j], this->gas_disk_vcirc[i][j]);
-    */
+    
+    /* uncomment to check if table is read in correctly
+    if (debug && (MyProcessorNumber == ROOT_PROCESSOR)) {
+      n++;
+      printf("%d, i=%d, r=%f, j=%d, z=%f, %f, %e\n",
+	           n, i, this->gas_disk_zones_r[i], j, z, this->gas_disk_log_rho[i][j], this->gas_disk_vcirc[i][j]);
+    } */
 
     i++;
     r_prev = r;
+
+    if (i >= MAX_DISK_ZONES || j >= MAX_DISK_ZONES)
+      ENZO_VFAIL("ReadInData: table size exceeds maximum of %"ISYM" rows/columns\n", MAX_DISK_ZONES);
   }
   this->gas_disk_nz = j+1;
 
   inFile.close();
 
   if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
-    printf("ReadInData: number of zones n_r=%d, n_z=%d\n\n", this->gas_disk_nr, this->gas_disk_nz);
+    printf("ReadInData: number of zones n_r=%d, n_z=%d\n", this->gas_disk_nr, this->gas_disk_nz);
 
   return;
 }
@@ -97,10 +102,9 @@ double EquilibriumGalaxyDisk::InterpolateEquilibriumDensityTable(double r_cyl, d
 
   if (i+1 < this->gas_disk_nr && j+1 < this->gas_disk_nz) { 
     rho = exp((1.0 - w_r)*(1.0 - w_z) * this->gas_disk_log_rho[i][j] +
-	      (1.0 - w_r)* w_z        * this->gas_disk_log_rho[i][j+1] +
-	       w_r       *(1.0 - w_z) * this->gas_disk_log_rho[i+1][j] +
-	       w_r       * w_z        * this->gas_disk_log_rho[i+1][j+1]);
-
+	            (1.0 - w_r)* w_z        * this->gas_disk_log_rho[i][j+1] +
+	             w_r       *(1.0 - w_z) * this->gas_disk_log_rho[i+1][j] +
+	             w_r       * w_z        * this->gas_disk_log_rho[i+1][j+1]);
   } else {
     rho = 0.0;
   }
@@ -128,9 +132,9 @@ double EquilibriumGalaxyDisk::InterpolateEquilibriumVcircTable(double r_cyl, dou
 
   if (i+1 < this->gas_disk_nr && j+1 < this->gas_disk_nz) { 
     vcirc = (1.0 - w_r)*(1.0 - w_z) * this->gas_disk_vcirc[i][j] +
-	    (1.0 - w_r)* w_z        * this->gas_disk_vcirc[i][j+1] +
-	     w_r       *(1.0 - w_z) * this->gas_disk_vcirc[i+1][j] +
-	     w_r       * w_z        * this->gas_disk_vcirc[i+1][j+1];
+	          (1.0 - w_r)* w_z        * this->gas_disk_vcirc[i][j+1] +
+	           w_r       *(1.0 - w_z) * this->gas_disk_vcirc[i+1][j] +
+	           w_r       * w_z        * this->gas_disk_vcirc[i+1][j+1];
 
   } else {
     vcirc = 0.0;

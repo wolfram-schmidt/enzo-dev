@@ -2,12 +2,16 @@
 /
 /  INITIALIZE DISK GALAXIES WITH LIVE HALOS
 /
-/  written by: Kai Rodenbeck and Simon Selg
+/  written by: Simon Selg and Wolfram Schmidt 
+/              (based on code by Kai Rodenbeck)
 /  date:       July, 2020
+/  modified:   October, 2023
 /
 /  PURPOSE:
-/    Reads initial conditions from files and 
+/    Reads initial conditions from files and
 /    sets up one or more disk galaxies and particle halos.
+/    Use https://github.com/wolfram-schmidt/isolated-galaxy
+/    or equivalent tool to generate initial conditions.
 /
 ************************************************************************/
 
@@ -28,18 +32,14 @@
 #include "Grid.h"
 #include "CosmologyParameters.h"
 #include "EquilibriumGalaxyDisk.h"
-#include "HydrostaticDisk.h"
+
+#undef VPHI_PROJECTION
 
 /********************* PROTOTYPES *********************/
 
 int GetUnits(float *DensityUnits, float *LengthUnits,
              float *TemperatureUnits, float *TimeUnits,
              float *VelocityUnits, float Time);
-
-double BESSI0(double y);
-double BESSI1(double y);
-double BESSK0(double y);
-double BESSK1(double y);
 
 /*******************************************************/
 
@@ -51,24 +51,9 @@ static float CosmologySimulationInitialFractionHM    = 2.0e-9;
 static float CosmologySimulationInitialFractionH2I   = 2.0e-20;
 static float CosmologySimulationInitialFractionH2II  = 3.0e-14;
 
-static int legacy = 0;
-
-// structure for legacy model test
-struct galaxy_parameters {
-  int N_x, N_z;
-  
-  // disk scales in cgs units
-  double r_s, z_s;
-  double dx, dz;
-  double sigma;
-  double v_s;
-
-  // halo scales in cgs units
-  double halo_mass, halo_scale;
-};
-
 
 int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
+                                       char* HaloDataFile[MAX_SPHERES],
                                        EquilibriumGalaxyDisk DiskTable[MAX_SPHERES],
                                        float SpherePosition[MAX_SPHERES][MAX_DIMENSION],
                                        float SphereRotAxis[MAX_SPHERES][MAX_DIMENSION],
@@ -88,13 +73,13 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                                        int partitioned)
 {
     /* declarations */
-    
+
     int dim, field, sphere, size;
     int DeNum, HINum, HIINum, HeINum, HeIINum, HeIIINum, HMNum, H2INum, H2IINum,
         DINum, DIINum, HDINum, MetalNum;
 
     /* create fields */
-    
+
     int ivel, imag, ietot, ieint;
     NumberOfBaryonFields = 0;
 
@@ -105,7 +90,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
         FieldType[ieint=NumberOfBaryonFields++] = InternalEnergy;
       ivel = NumberOfBaryonFields;
       FieldType[NumberOfBaryonFields++] = Velocity1;
-      if (GridRank > 1) 
+      if (GridRank > 1)
         FieldType[NumberOfBaryonFields++] = Velocity2;
       if (GridRank > 2)
         FieldType[NumberOfBaryonFields++] = Velocity3;
@@ -142,66 +127,49 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
       }
     }
 
-    if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
-        std::cout << "UseMetals=" << UseMetals << std::endl;    
-  
     if (UseMetals)
     {
       MetalNum = NumberOfBaryonFields;
       FieldType[NumberOfBaryonFields++] = Metallicity;
       if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
-        std::cout << "using metals, MetalNum=" << MetalNum << " " << NumberOfBaryonFields << std::endl;    
+        std::cout << "using metals, MetalNum=" << MetalNum << " " << NumberOfBaryonFields << std::endl;
     }
 
     int phip_num;
     if (UsePoissonDivergenceCleaning){
         FieldType[phip_num=NumberOfBaryonFields++] = Phi_pField;
-        FieldType[NumberOfBaryonFields++] = DebugField;  
+        FieldType[NumberOfBaryonFields++] = DebugField;
     }
-    
+
     if (WritePotential)
         FieldType[NumberOfBaryonFields++] = GravPotential;
-    
-    if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
-      std::cout << "baryon field indizes: ivel=" << ivel << ", imag=" << imag << ", ietot=" << ietot 
-                << ", ieint=" << ieint << ", iBz=" << iBz << ", iPhi=" << iPhi << ", MetalNum=" << MetalNum << std::endl;    
-    
 
     /* Return if this doesn't concern us. */
-    
+
     if (ProcessorNumber != MyProcessorNumber)
     {
         return SUCCESS;
     }
 
-    /* Part of Parallel Root Grid IO. The initializer is called twice. 
+    /* Part of Parallel Root Grid IO. The initializer is called twice.
        In its first call, the grid initializer does (almost) nothing. */
 
     if (SetBaryonFields == 0)
       return SUCCESS;
-    
+
     float DensityUnits, LengthUnits, TemperatureUnits, TimeUnits, VelocityUnits,
       CriticalDensity = 1, BoxLength = 1, mu = Mu;
-    
+
     GetUnits(&DensityUnits, &LengthUnits, &TemperatureUnits,
          &TimeUnits, &VelocityUnits, Time);
 
-    /*
-    CriticalDensity = 2.78e11*pow(0.74,2); // in Msolar/Mpc^3 for h=0.74
-    BoxLength = LengthUnits / 3.086e24;
-    HubbleConstantNow = 1.0;
-    OmegaMatterNow = 1.0;
-    */
-
-    double MagnConversionFactor=sqrt(4.0*3.14159/(VelocityUnits*VelocityUnits)/DensityUnits);
-    
     /* =====================================================================
-     * S. Selg (10/2019): N-BODY REALIZATION OF A DARK MATTER HALO. 
+     * S. Selg (10/2019): N-BODY REALIZATION OF A DARK MATTER HALO.
      *
      * STAGE I: Get the number of particles in order to allocate memory.
      */
 
-    if (UseParticles == 1 && level == 0 && partitioned == 1) // DM only 
+    if (UseParticles == 1 && level == 0 && partitioned == 1) // DM only
     {
         int SetupLoopCount = 0;
         int part_id = 0; // global counter
@@ -211,7 +179,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
         {
             if (SetupLoopCount == 1)
             {
-                /* STAGE II: Delete old particles and use count 
+                /* STAGE II: Delete old particles and use count
                    from previous loop to allocate new ones.  */
 
                 if (NumberOfParticles > 0)
@@ -227,8 +195,8 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                 printf("GalaxyLiveHalo: allocating %"ISYM" particles\n", NumberOfParticles);
 
                 this->AllocateNewParticles(NumberOfParticles);
-            }   
-        
+            }
+
             double XLow, XHigh, YLow, YHigh, ZLow,ZHigh;
 
             /* variables for IC raw data */
@@ -262,23 +230,15 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
                 if (debug && SetupLoopCount == 0)
                 {
-                  std::cout << "GalaxyLiveHalo: grid x-boundaries (pc): " << XLow/pc_cm << ", " << XHigh/pc_cm << std::endl;
-                  std::cout << "GalaxyLiveHalo: grid y-boundaries (pc): " << YLow/pc_cm << ", " << YHigh/pc_cm << std::endl;
-                  std::cout << "GalaxyLiveHalo: grid z-boundaries (pc): " << ZLow/pc_cm << ", " << ZHigh/pc_cm << std::endl;
+                  std::cout << "GalaxyLiveHalo: grid x-boundaries (kpc): " << XLow/(1e3*pc_cm) << ", " << XHigh/(1e3*pc_cm) << std::endl;
+                  std::cout << "GalaxyLiveHalo: grid y-boundaries (kpc): " << YLow/(1e3*pc_cm) << ", " << YHigh/(1e3*pc_cm) << std::endl;
+                  std::cout << "GalaxyLiveHalo: grid z-boundaries (kpc): " << ZLow/(1e3*pc_cm) << ", " << ZHigh/(1e3*pc_cm) << std::endl;
                 }
 
                 /* read ICs from file */
 
                 std::ifstream particle_file;
-                if (sphere == 0)
-                    particle_file.open("particle_ic_a");
-                else if (sphere == 1)
-                    particle_file.open("particle_ic_b");
-                else
-                {
-                    fprintf(stderr,"Error in GalaxyLiveHaloInitializeGrid: particle file for halo %"ISYM" not defined\n", sphere);
-                    return FAIL;
-                }
+                particle_file.open(HaloDataFile[sphere]);
 
                 if (particle_file.is_open())
                 {
@@ -302,7 +262,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
                         rawX *= pc_cm;
                         rawY *= pc_cm;
-                        rawZ *= pc_cm;             
+                        rawZ *= pc_cm;
                         rawVelX *= 1e2;
                         rawVelY *= 1e2;
                         rawVelZ *= 1e2;
@@ -322,23 +282,23 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                             {
                                 /* STAGE III: assign particle properties */
 
-                                ParticleMass[npart]        = rawMass / pow(CellWidth[0][GridStartIndex[0]], 3.0) / 
+                                ParticleMass[npart]        = rawMass / pow(CellWidth[0][GridStartIndex[0]], 3.0) /
                                                              (DensityUnits * pow(LengthUnits, 3.0));
                                 ParticleNumber[npart]      = part_id;
                                 ParticleType[npart]        = PARTICLE_TYPE_DARK_MATTER;
                                 ParticlePosition[0][npart] = rawX / LengthUnits + SpherePosition[sphere][0];
                                 ParticlePosition[1][npart] = rawY / LengthUnits + SpherePosition[sphere][1];
                                 ParticlePosition[2][npart] = rawZ / LengthUnits + SpherePosition[sphere][2];
-                                ParticleVelocity[0][npart] = rawVelX / VelocityUnits + SphereVelocity[sphere][0];
-                                ParticleVelocity[1][npart] = rawVelY / VelocityUnits + SphereVelocity[sphere][1];
-                                ParticleVelocity[2][npart] = rawVelZ / VelocityUnits + SphereVelocity[sphere][2];
+                                ParticleVelocity[0][npart] = (rawVelX + SphereVelocity[sphere][0]) / VelocityUnits;
+                                ParticleVelocity[1][npart] = (rawVelY + SphereVelocity[sphere][1]) / VelocityUnits;
+                                ParticleVelocity[2][npart] = (rawVelZ + SphereVelocity[sphere][2]) / VelocityUnits;
                             }
                             npart++;
                         }
                         part_id++;
 
-                    } // END WHILE new line 
-                
+                    } // END WHILE new line
+
                 } else {
                     fprintf(stderr,"Error in GalaxyLiveHaloInitializeGrid: cannot open particle file for halo %"ISYM"\n", sphere);
                     return FAIL;
@@ -348,7 +308,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
             } // END FOR spheres
         } // END FOR SetupLoopCount
-        
+
         if (MyProcessorNumber == ROOT_PROCESSOR)
           printf("GalaxyLiveHalo: total number of particles: %"ISYM"\n", part_id);
 
@@ -356,42 +316,16 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
     } // END IF UseParticles
 
-    if (UseGas) 
+    if (UseGas)
     {
-      float r_max[MAX_SPHERES];
+      /* ==================================================================
+       * TRANSFORM DISK COORDINATES AND INTERPOLATE TO GRID
+       */
+
+      float r_max[MAX_SPHERES], density_min[MAX_SPHERES];
       float SoundSpeedIsoth[MAX_SPHERES];
       float SphereRotNorm[MAX_SPHERES];
       float SphereTransformMatrix[MAX_SPHERES][MAX_DIMENSION][MAX_DIMENSION];
-
-      double poisson_coeff = 4*pi*GravConst; // cgs units
-
-      /* legacy method */
-
-      hydrostatic_disk Galaxy[MAX_SPHERES];
-    
-      /* test disk parameters in cgs units
-         - disk parameters from enzo-e/input/IsolatedGalaxy 
-         - Hernquist halo: M_vir = 3e10 M_sun, r_vir = 65.57 kpc */
-
-      galaxy_parameters test;
-
-      if (legacy) 
-      {
-        test.N_x = 101;
-        test.N_z = 144;
-        
-        test.r_s = 1.2856989923909257e+22;
-        test.z_s = 8.999892947045047e+21;
-        test.dx = 0.1*test.r_s;
-        test.dz = 0.1*test.z_s;
-
-        // disk mass = 1.3913997490703146e+41 g
-        test.sigma = 1.3396564680155456e-4;
-        test.v_s = sqrt(poisson_coeff * test.sigma * test.r_s);
-
-        test.halo_mass = 8.008978055391178e+43;
-        test.halo_scale = 3.2109177913790463e+22;
-      }
 
       /* transformation from disk to grid coordinates */
 
@@ -403,99 +337,75 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
         SphereRotNorm[sphere] = sqrt(SphereRotAxis[sphere][0]*SphereRotAxis[sphere][0] +
                                      SphereRotAxis[sphere][1]*SphereRotAxis[sphere][1] +
                                      SphereRotAxis[sphere][2]*SphereRotAxis[sphere][2]);
-            
+
         z_sl[0] = SphereRotAxis[sphere][0]/SphereRotNorm[sphere];
         z_sl[1] = SphereRotAxis[sphere][1]/SphereRotNorm[sphere];
         z_sl[2] = SphereRotAxis[sphere][2]/SphereRotNorm[sphere];
-            
+
         x_sl[0] = 1.0 - z_sl[0];
         x_sl[1] = -z_sl[0];
         x_sl[2] = -z_sl[1];
-            
+
         norm = sqrt(x_sl[0]*x_sl[0] + x_sl[1]*x_sl[1] + x_sl[2]*x_sl[2]);
 
         x_sl[0] /= norm;
         x_sl[1] /= norm;
         x_sl[2] /= norm;
-          
+
         SphereTransformMatrix[sphere][0][0] = x_sl[0];
         SphereTransformMatrix[sphere][2][0] = z_sl[0];
         SphereTransformMatrix[sphere][1][0] = z_sl[1]*x_sl[2] - z_sl[2]*x_sl[1];
-            
+
         SphereTransformMatrix[sphere][0][1] = x_sl[1];
         SphereTransformMatrix[sphere][2][1] = z_sl[1];
         SphereTransformMatrix[sphere][1][1] = z_sl[2]*x_sl[0] - z_sl[0]*x_sl[2];
-            
+
         SphereTransformMatrix[sphere][0][2] = x_sl[2];
         SphereTransformMatrix[sphere][2][2] = z_sl[2];
         SphereTransformMatrix[sphere][1][2] = z_sl[0]*x_sl[1] - z_sl[1]*x_sl[0];
 
         if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
-          std::cout << SphereTransformMatrix[sphere][0][0] << ", " << SphereTransformMatrix[sphere][0][1] << ", " << SphereTransformMatrix[sphere][0][2] << "\n" 
-                    << SphereTransformMatrix[sphere][1][0] << ", " << SphereTransformMatrix[sphere][1][1] << ", " << SphereTransformMatrix[sphere][1][2] << "\n" 
+          std::cout << "GalaxyLiveHalo: coordinate transformation matrix:\n"
+                    << SphereTransformMatrix[sphere][0][0] << ", " << SphereTransformMatrix[sphere][0][1] << ", " << SphereTransformMatrix[sphere][0][2] << "\n"
+                    << SphereTransformMatrix[sphere][1][0] << ", " << SphereTransformMatrix[sphere][1][1] << ", " << SphereTransformMatrix[sphere][1][2] << "\n"
                     << SphereTransformMatrix[sphere][2][0] << ", " << SphereTransformMatrix[sphere][2][1] << ", " << SphereTransformMatrix[sphere][2][2] << std::endl;
 
+        // cylindrical/spherical region in which disk data are interpolated
         r_max[sphere] = SphereRadius[sphere] * kpc_cm/LengthUnits;
-        
-        SoundSpeedIsoth[sphere] = sqrt(kboltz * SphereTemperature[sphere] / (mu * mh)) 
-                                  / VelocityUnits;
-        
+
+        // density floor to ensure that disk pressure exceeds pressure of ambient medium
+        density_min[sphere] = InitialDensity * InitialTemperature/SphereTemperature[sphere];
+
+        // isothermal speed of sound (pressure/density)
+        SoundSpeedIsoth[sphere] = sqrt(kboltz * SphereTemperature[sphere] / (mu * mh)) / VelocityUnits;
+
         if (debug && (MyProcessorNumber == ROOT_PROCESSOR)) {
           printf("GalaxyLiveHalo: sphere radius: %"GSYM" kpc, %"GSYM"\n", SphereRadius[sphere], r_max[sphere]);
+          printf("GalaxyLiveHalo: sphere density floor: %"GSYM" g/cm^3q, %"GSYM"\n", density_min[sphere] * DensityUnits, density_min[sphere]);
           printf("GalaxyLiveHalo: background density: %"GSYM" g/cm^3\n", InitialDensity * DensityUnits);
-          printf("GalaxyLiveHalo: background magnetic field: %"GSYM" G\n", 
+          printf("GalaxyLiveHalo: background magnetic field: %"GSYM" G\n",
                  sqrt(4 * pi * DensityUnits) * VelocityUnits * InitialMagnField);
           printf("GalaxyLiveHalo: isothermal speed of sound: %"GSYM" cm/s\n", SoundSpeedIsoth[sphere] * VelocityUnits);
-          if (legacy) 
-            printf("GalaxyLiveHalo: central disk velocity =  %"GSYM"cm/s\n", test.v_s);
-        }
-
-        /* compute disk data using legacy method */
-
-        if (legacy) 
-        {
-          Galaxy[sphere] = hydrostatic_disk(test.N_x, test.N_z, test.dx, test.dz, test.r_s, test.z_s, 
-                                            test.sigma, SoundSpeedIsoth[sphere] * VelocityUnits);
-
-          Galaxy[sphere].set_halo_mass(test.halo_mass);
-          Galaxy[sphere].set_halo_scale(test.halo_scale);
-
-          double err=1.0;   
-          int counter=0;
-        
-          while (err > 1.0e-6 && counter < 100)
-          {
-            err=Galaxy[sphere].integrate();
-            counter++;
-            if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
-              printf("\nGalaxyLiveHalo: legacy model sphere %i: %ith iteration, error=%e\n", sphere, counter, err);
-          }
-
-          Galaxy[sphere].rotation_curve();
         }
       } // END FOR sphere
 
       /* Set up the baryon field. */
-    
+
       this->AllocateGrids();
 
       /* Loop over the grid. */
-    
+
       int i, j, k;
       int n = 0;
 
-      double x, y, z;     
+      bool isInSphere;
+
+      double x, y, z;
       double xpos, ypos, zpos;
       double r, rcyl, xcyl, ycyl, zcyl;
-      double norm, vphi, Bphi;
       double density, temperature, metallicity;
+      double norm, damping, vphi, Bphi;
       double Toroidal[MAX_DIMENSION], Velocity[MAX_DIMENSION], MagnField[MAX_DIMENSION];
-
-      /*
-      if((MyProcessorNumber == ROOT_PROCESSOR))
-        for (i = 0; i < GridDimension[0]; i++)
-          printf("Delta x: %"GSYM" pc\n", CellWidth[0][i]*LengthUnits/pc_cm);
-      */
 
       for (k = 0; k < GridDimension[2]; k++)
         for (j = 0; j < GridDimension[1]; j++)
@@ -505,17 +415,22 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
             y = CellLeftEdge[1][j] + 0.5*CellWidth[1][j];
             z = CellLeftEdge[2][k] + 0.5*CellWidth[2][k];
 
+            isInSphere = false;
+
             density = InitialDensity;
             temperature = InitialTemperature;
             metallicity = MetallicityFloor;
-            
-            for (dim = 0; dim < MAX_DIMENSION; dim++) 
+
+            for (dim = 0; dim < MAX_DIMENSION; dim++)
             {
-              Velocity[dim] = 0e0;
-              MagnField[dim] = 0e0;
+              Velocity[dim]  = 0.0e0;
+              MagnField[dim] = 0.0e0;
+              Toroidal[dim]  = 0.0e0;
             }
 
-            for (sphere = 0; sphere < NumberOfSpheres; sphere++) 
+            norm = 1.0; // to avoid division by zero
+
+            for (sphere = 0; sphere < NumberOfSpheres; sphere++)
             {
               // displacement from sphere center
               xpos = x - SpherePosition[sphere][0];
@@ -524,20 +439,26 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
               // radial distance from center
               r = sqrt(pow(fabs(xpos), 2) + pow(fabs(ypos), 2) + pow(fabs(zpos), 2));
-              r = max(r, 0.1*CellWidth[0][0]);
-        
-              if (r < r_max[sphere]) 
-              {          
+
+              if (r < r_max[sphere])
+              {
+                /* Terminate if spheres are not disjunct. */
+
+                if (isInSphere)
+                    ENZO_VFAIL("Error in Grid::GalaxyLiveHaloInitializeGrid: sphere %"ISYM" overlaps with other sphere", sphere);
+
+                isInSphere = true; // raise the flag
+
                 /* Transform to disk coordinate system (Cartesian/cylindrical). */
 
                 xcyl = xpos*SphereTransformMatrix[sphere][0][0] +
                        ypos*SphereTransformMatrix[sphere][0][1] +
                        zpos*SphereTransformMatrix[sphere][0][2];
-                  
+
                 ycyl = xpos*SphereTransformMatrix[sphere][1][0] +
                        ypos*SphereTransformMatrix[sphere][1][1] +
                        zpos*SphereTransformMatrix[sphere][1][2];
-                  
+
                 zcyl = xpos*SphereTransformMatrix[sphere][2][0] +
                        ypos*SphereTransformMatrix[sphere][2][1] +
                        zpos*SphereTransformMatrix[sphere][2][2];
@@ -547,85 +468,84 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
                 /* Interpolate disk data. */
 
-                if (legacy)
-                {
-                  double v_g_sqr, v_p_sqr, v_dm_sqr;
-                  double r_n = 0.5*rcyl*LengthUnits / (test.r_s); // normalized radial coordinate
-
-                  density = max(InitialDensity,
-                                Galaxy[sphere].intpl_rho(rcyl*LengthUnits, fabs(zcyl)*LengthUnits) / DensityUnits);
-            
-                  v_g_sqr  = pow(test.v_s * r_n, 2) * (BESSI0(r_n) * BESSK0(r_n) - BESSI1(r_n) * BESSK1(r_n)) 
-                             / (VelocityUnits*VelocityUnits);
-                  v_p_sqr  = Galaxy[sphere].intpl_v_sqr(rcyl*LengthUnits, fabs(zcyl)*LengthUnits) 
-                             / (VelocityUnits*VelocityUnits);
-                  v_dm_sqr = Galaxy[sphere].halo_vel_sqr(rcyl*LengthUnits, 0.0)
-                             / (VelocityUnits*VelocityUnits);
-
-                  vphi = sqrt(fmax(0.0, v_g_sqr + v_p_sqr + v_dm_sqr));
-
-                  /*
-                  if (debug && fabs(ycyl) <= CellWidth[1][j] && fabs(zcyl) <= CellWidth[2][k])
-                  {
-                    printf("r_n = %"GSYM": v_g_sqr =  %"GSYM", v_p_sqr =  %"GSYM", v_dm_sqr =  %"GSYM", vphi = %"GSYM"\n", 
-                           2*r_n, v_g_sqr * VelocityUnits*VelocityUnits, v_p_sqr * VelocityUnits*VelocityUnits, 
-                           v_dm_sqr * VelocityUnits*VelocityUnits, vphi * VelocityUnits);
-                  }
-                  */
-                }
-                else 
-                {
-                  density = max(InitialDensity,
-                                DiskTable[sphere].InterpolateEquilibriumDensityTable(rcyl*LengthUnits, zcyl*LengthUnits) / DensityUnits);
-
-                  vphi = DiskTable[sphere].InterpolateEquilibriumVcircTable(rcyl*LengthUnits, zcyl*LengthUnits) / VelocityUnits;
+                density = DiskTable[sphere].InterpolateEquilibriumDensityTable(rcyl*LengthUnits, zcyl*LengthUnits) / DensityUnits;
+                vphi    = DiskTable[sphere].InterpolateEquilibriumVcircTable(rcyl*LengthUnits, zcyl*LengthUnits) / VelocityUnits;
+                Bphi    = 0.0;
+                
+                if (xpos > 0.25*CellWidth[0][i] && xpos < 0.75*CellWidth[0][i] &&
+                    ypos > 0.25*CellWidth[1][j] && ypos < 0.75*CellWidth[1][j]) {
+                  std::cout << sphere << " " << CellWidth[0][i] << " " << rcyl * LengthUnits/pc_cm << " " << zcyl * LengthUnits/pc_cm << " " 
+                            << density * DensityUnits << " " << vphi * VelocityUnits << std::endl;
                 }
 
-                /* cross product of unit vectors along rotation axis and in radial direction */
+#ifdef VPHI_PROJECTION
+                /* Project rotation velocity to midplane */
 
-                norm = SphereRotNorm[sphere]*r;
+                vphi *= rcyl/r;
+#else
+                /* Exponentially damp rotation velocity outside of the disk */
 
-                Toroidal[0] = (SphereRotAxis[sphere][1]*zpos - SphereRotAxis[sphere][2]*ypos)/norm;
-                Toroidal[1] = (SphereRotAxis[sphere][2]*xpos - SphereRotAxis[sphere][0]*zpos)/norm;
-                Toroidal[2] = (SphereRotAxis[sphere][0]*ypos - SphereRotAxis[sphere][1]*xpos)/norm;
+                //vphi *= exp(-density_min[sphere]/density);
+#endif
 
-                /* rotation velocity plus center-of-mass velocity */
+                if (density >= density_min[sphere])
+                {
+                  /* Set disk temperature, metallicity, and magnetic field. */
 
-                Velocity[0] = vphi*Toroidal[0] + SphereVelocity[sphere][0];
-                Velocity[1] = vphi*Toroidal[1] + SphereVelocity[sphere][1];
-                Velocity[2] = vphi*Toroidal[2] + SphereVelocity[sphere][2];
+                  temperature = SphereTemperature[sphere];
+                  metallicity = SphereMetallicity[sphere];
+                  Bphi = sqrt(2 * density / SphereBeta[sphere]) * SoundSpeedIsoth[sphere];
+                  damping = 1.0;
+                }
+                else
+                {                
+                  /* Set density floor and exponential damping of rotation velocity. */
 
-                /* toroidal magnetic field */
+                  damping = exp(1 - density_min[sphere]/density);
+                  density = InitialDensity;
+                }
 
-                Bphi = sqrt(2 * density / SphereBeta[sphere]) * SoundSpeedIsoth[sphere];
+                /* Define azimuthal unit vector if not at disk center. */
 
-                MagnField[0] = Bphi*Toroidal[0];
-                MagnField[1] = Bphi*Toroidal[1];
-                MagnField[2] = Bphi*Toroidal[2];
+                if (r > 0.5*CellWidth[0][i]) 
+                {
+                  
+                  Toroidal[0] = (SphereRotAxis[sphere][1]*zpos - SphereRotAxis[sphere][2]*ypos);
+                  Toroidal[1] = (SphereRotAxis[sphere][2]*xpos - SphereRotAxis[sphere][0]*zpos);
+                  Toroidal[2] = (SphereRotAxis[sphere][0]*ypos - SphereRotAxis[sphere][1]*xpos);
 
-                metallicity = (density > InitialDensity) ? SphereMetallicity[sphere] : MetallicityFloor;
+                  norm = sqrt(Toroidal[0]*Toroidal[0] + Toroidal[1]*Toroidal[1] + Toroidal[2]*Toroidal[2]);
+                }
 
+                /* Set rotation plus center-of-mass velocity and toroidal magnetic field. */
+
+                for (dim = 0; dim < MAX_DIMENSION; dim++)
+                {
+                  Toroidal[dim] /= norm;
+                  Velocity[dim]  = (vphi*Toroidal[dim] + SphereVelocity[sphere][dim] / VelocityUnits) * damping;
+                  MagnField[dim] =  Bphi*Toroidal[dim];
+                }
               } // END IF inside sphere
             } // END FOR sphere
 
             /* Set density. */
-        
+
             BaryonField[iden][n] = density;
-        
+
             /* If doing multi-species (HI, etc.), set these. */
-        
+
             if (MultiSpecies > 0) {
-          
+
               BaryonField[HIINum][n] = CosmologySimulationInitialFractionHII *
                 CoolData.HydrogenFractionByMass * BaryonField[0][n];
               BaryonField[HeIINum][n] = CosmologySimulationInitialFractionHeII*
                 BaryonField[0][n] * 4.0 * (1.0-CoolData.HydrogenFractionByMass);
               BaryonField[HeIIINum][n] = CosmologySimulationInitialFractionHeIII*
                 BaryonField[0][n] * 4.0 * (1.0-CoolData.HydrogenFractionByMass);
-              BaryonField[HeINum][n] = 
+              BaryonField[HeINum][n] =
                 (1.0 - CoolData.HydrogenFractionByMass)*BaryonField[0][n] -
                 BaryonField[HeIINum][n] - BaryonField[HeIIINum][n];
-          
+
               if (MultiSpecies > 1) {
                 BaryonField[HMNum][n] = CosmologySimulationInitialFractionHM*
                   BaryonField[HIINum][n]* pow(temperature,float(0.88));
@@ -634,22 +554,22 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                 BaryonField[H2INum][n] = CosmologySimulationInitialFractionH2I*
                   BaryonField[0][n]*CoolData.HydrogenFractionByMass*pow(301.0,5.1);
               }
-          
-              BaryonField[HINum][n] = 
+
+              BaryonField[HINum][n] =
                 CoolData.HydrogenFractionByMass*BaryonField[0][n]
                 - BaryonField[HIINum][n];
               if (MultiSpecies > 1)
                 BaryonField[HINum][n] -= BaryonField[HMNum][n]
                   + BaryonField[H2IINum][n] + BaryonField[H2INum][n];
-              
-              BaryonField[DeNum][n] = BaryonField[HIINum][n] + 
+
+              BaryonField[DeNum][n] = BaryonField[HIINum][n] +
                 0.25*BaryonField[HeIINum][n] + 0.5*BaryonField[HeIIINum][n];
               if (MultiSpecies > 1)
-                BaryonField[DeNum][n] += 0.5*BaryonField[H2IINum][n] - 
+                BaryonField[DeNum][n] += 0.5*BaryonField[H2IINum][n] -
                   BaryonField[HMNum][n];
-              
+
               /* Set Deuterium species (assumed to be negligible). */
-          
+
               if (MultiSpecies > 2) {
                 BaryonField[DINum][n] = CoolData.DeuteriumToHydrogenRatio*
                   BaryonField[HINum][n];
@@ -664,12 +584,12 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 	            BaryonField[MetalNum][n] = metallicity*density;
 
             /* Set Velocities. */
-    
+
             for (int dim = 0; dim < GridRank; dim++)
               BaryonField[ivel+dim][n] = Velocity[dim];
-        
+
             /* Set energy (thermal and then total if necessary) and magnetic field. */
-      
+
             BaryonField[ietot][n] = temperature/TemperatureUnits / ((Gamma-1.0)*mu);
 
             if (DualEnergyFormalism)
@@ -677,7 +597,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
             for (dim = 0; dim < GridRank; dim++)
               BaryonField[ietot][n] += 0.5*pow(BaryonField[ivel+dim][n], 2);
-            
+
             if (HydroMethod == MHD_RK) {
 
               // initialize uniform field in z-direction
@@ -696,6 +616,6 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
             }
           } // END loop over grid
     } // END FOR UseGas
-        
+
     return SUCCESS;
 }

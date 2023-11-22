@@ -3130,8 +3130,9 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
   int PrepareAlfvenVelocityNormalization(double *v_rms, double *Volume);
   int NormalizeMagneticFields(Eflt factor);
 
-  int GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
-				   EquilibriumGalaxyDisk DiskTable[MAX_SPHERES],
+  int GalaxyLiveHaloInitializeGrid(int NumberOfHalos,
+				   char* HaloDataFile[MAX_SPHERES],
+               EquilibriumGalaxyDisk DiskTable[MAX_SPHERES],
 				   float SpherePosition[MAX_SPHERES][MAX_DIMENSION],
 				   float SphereRotAxis[MAX_SPHERES][MAX_DIMENSION],
 				   float SphereVelocity[MAX_SPHERES][MAX_DIMENSION],
