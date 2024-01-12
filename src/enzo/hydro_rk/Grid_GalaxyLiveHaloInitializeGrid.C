@@ -33,8 +33,6 @@
 #include "CosmologyParameters.h"
 #include "EquilibriumGalaxyDisk.h"
 
-#undef VPHI_PROJECTION
-
 /********************* PROTOTYPES *********************/
 
 int GetUnits(float *DensityUnits, float *LengthUnits,
@@ -51,7 +49,6 @@ static float CosmologySimulationInitialFractionHM    = 2.0e-9;
 static float CosmologySimulationInitialFractionH2I   = 2.0e-20;
 static float CosmologySimulationInitialFractionH2II  = 3.0e-14;
 
-
 int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                                        char* HaloDataFile[MAX_SPHERES],
                                        EquilibriumGalaxyDisk DiskTable[MAX_SPHERES],
@@ -62,6 +59,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                                        float SphereTemperature[MAX_SPHERES],
                                        float SphereBeta[MAX_SPHERES],
                                        float SphereMetallicity[MAX_SPHERES],
+                                       float SphereMetallicityScale[MAX_SPHERES],
                                        float InitialTemperature,
                                        float InitialDensity,
                                        float InitialMagnField,
@@ -131,8 +129,6 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
     {
       MetalNum = NumberOfBaryonFields;
       FieldType[NumberOfBaryonFields++] = Metallicity;
-      if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
-        std::cout << "using metals, MetalNum=" << MetalNum << " " << NumberOfBaryonFields << std::endl;
     }
 
     int phip_num;
@@ -192,7 +188,8 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                 part_id = 0;
                 npart = 0;
 
-                printf("GalaxyLiveHalo: allocating %"ISYM" particles\n", NumberOfParticles);
+                if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
+                    printf("GalaxyLiveHalo: allocating %"ISYM" particles\n", NumberOfParticles);
 
                 this->AllocateNewParticles(NumberOfParticles);
             }
@@ -309,10 +306,11 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
             } // END FOR spheres
         } // END FOR SetupLoopCount
 
-        if (MyProcessorNumber == ROOT_PROCESSOR)
+        if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
           printf("GalaxyLiveHalo: total number of particles: %"ISYM"\n", part_id);
 
-        printf("GalaxyLiveHalo, processor: %"ISYM": number of particles on current grid: %"ISYM"\n", MyProcessorNumber, NumberOfParticles);
+        if (debug)
+          printf("GalaxyLiveHalo, processor: %"ISYM": number of particles on current grid: %"ISYM"\n", MyProcessorNumber, NumberOfParticles);
 
     } // END IF UseParticles
 
@@ -322,7 +320,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
        * TRANSFORM DISK COORDINATES AND INTERPOLATE TO GRID
        */
 
-      float r_max[MAX_SPHERES], density_min[MAX_SPHERES];
+      float r_max[MAX_SPHERES], r_metal[MAX_SPHERES], density_min[MAX_SPHERES];
       float SoundSpeedIsoth[MAX_SPHERES];
       float SphereRotNorm[MAX_SPHERES];
       float SphereTransformMatrix[MAX_SPHERES][MAX_DIMENSION][MAX_DIMENSION];
@@ -373,15 +371,19 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
         // cylindrical/spherical region in which disk data are interpolated
         r_max[sphere] = SphereRadius[sphere] * kpc_cm/LengthUnits;
 
+        // metallicity scale length in code units
+        r_metal[sphere] = SphereMetallicityScale[sphere] * kpc_cm/LengthUnits;
+
         // density floor to ensure that disk pressure exceeds pressure of ambient medium
         density_min[sphere] = InitialDensity * InitialTemperature/SphereTemperature[sphere];
 
         // isothermal speed of sound (pressure/density)
         SoundSpeedIsoth[sphere] = sqrt(kboltz * SphereTemperature[sphere] / (mu * mh)) / VelocityUnits;
 
-        if (debug && (MyProcessorNumber == ROOT_PROCESSOR)) {
+        if (MyProcessorNumber == ROOT_PROCESSOR) {
           printf("GalaxyLiveHalo: sphere radius: %"GSYM" kpc, %"GSYM"\n", SphereRadius[sphere], r_max[sphere]);
           printf("GalaxyLiveHalo: sphere density floor: %"GSYM" g/cm^3q, %"GSYM"\n", density_min[sphere] * DensityUnits, density_min[sphere]);
+          printf("GalaxyLiveHalo: metallicity scale length: %"GSYM" kpc, %"GSYM"\n", SphereMetallicityScale[sphere], r_metal[sphere]);
           printf("GalaxyLiveHalo: background density: %"GSYM" g/cm^3\n", InitialDensity * DensityUnits);
           printf("GalaxyLiveHalo: background magnetic field: %"GSYM" G\n",
                  sqrt(4 * pi * DensityUnits) * VelocityUnits * InitialMagnField);
@@ -472,28 +474,12 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                 vphi    = DiskTable[sphere].InterpolateEquilibriumVcircTable(rcyl*LengthUnits, zcyl*LengthUnits) / VelocityUnits;
                 Bphi    = 0.0;
                 
-                if (xpos > 0.25*CellWidth[0][i] && xpos < 0.75*CellWidth[0][i] &&
-                    ypos > 0.25*CellWidth[1][j] && ypos < 0.75*CellWidth[1][j]) {
-                  std::cout << sphere << " " << CellWidth[0][i] << " " << rcyl * LengthUnits/pc_cm << " " << zcyl * LengthUnits/pc_cm << " " 
-                            << density * DensityUnits << " " << vphi * VelocityUnits << std::endl;
-                }
-
-#ifdef VPHI_PROJECTION
-                /* Project rotation velocity to midplane */
-
-                vphi *= rcyl/r;
-#else
-                /* Exponentially damp rotation velocity outside of the disk */
-
-                //vphi *= exp(-density_min[sphere]/density);
-#endif
-
                 if (density >= density_min[sphere])
                 {
                   /* Set disk temperature, metallicity, and magnetic field. */
 
                   temperature = SphereTemperature[sphere];
-                  metallicity = SphereMetallicity[sphere];
+                  metallicity = max(SphereMetallicity[sphere] * exp(-rcyl/r_metal[sphere]), MetallicityFloor);
                   Bphi = sqrt(2 * density / SphereBeta[sphere]) * SoundSpeedIsoth[sphere];
                   damping = 1.0;
                 }
@@ -581,7 +567,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
             } // END IF MultiSpecies
 
             if (UseMetals)
-	            BaryonField[MetalNum][n] = metallicity*density;
+                BaryonField[MetalNum][n] = metallicity*density;
 
             /* Set Velocities. */
 
