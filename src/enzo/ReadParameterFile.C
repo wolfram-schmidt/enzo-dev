@@ -345,6 +345,12 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
 	     CellFlaggingMethod+0, CellFlaggingMethod+1, CellFlaggingMethod+2,
 	     CellFlaggingMethod+3, CellFlaggingMethod+4, CellFlaggingMethod+5,
 	     CellFlaggingMethod+6);
+    ret += sscanf(line, "ThreshMin              = %"FSYM" %"FSYM" %"FSYM" %"FSYM" %"FSYM" %"FSYM" %"FSYM,
+                  ThreshMin+0, ThreshMin+1, ThreshMin+2, ThreshMin+3,
+                  ThreshMin+4, ThreshMin+5, ThreshMin+6);
+    ret += sscanf(line, "ThreshFct              = %"FSYM" %"FSYM" %"FSYM" %"FSYM" %"FSYM" %"FSYM" %"FSYM,
+                  ThreshFct+0, ThreshFct+1, ThreshFct+2, ThreshFct+3,
+                  ThreshFct+4, ThreshFct+5, ThreshFct+6);
     ret += sscanf(line, "FluxCorrection         = %"ISYM, &FluxCorrection);
     ret += sscanf(line, "UseCoolingTimestep     = %"ISYM, &UseCoolingTimestep);
     ret += sscanf(line, "CoolingTimestepSafetyFactor = %"FSYM, &CoolingTimestepSafetyFactor);
@@ -519,6 +525,10 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
     ret += sscanf(line, "PointSourceGravityCoreRadius = %"FSYM,
 		  &PointSourceGravityCoreRadius);
 
+    ret += sscanf(line, "PointSourceGravityCutoffRadius = %"FSYM,
+                  &PointSourceGravityCutoffRadius); // LI/WS for the cloud in a wind
+    ret += sscanf(line, "CloudWindCentralDensity = %"FSYM,&CloudWindCentralDensity);
+
     ret += sscanf(line, "DiskGravity                        = %"ISYM,&DiskGravity);
     ret += sscanf(line, "DiskGravityPosition                = %"PSYM" %"PSYM" %"PSYM,
       DiskGravityPosition, DiskGravityPosition+1, DiskGravityPosition+2);
@@ -585,6 +595,8 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
                      DrivenFlowAutoCorrl, DrivenFlowAutoCorrl+1, DrivenFlowAutoCorrl+2);
 
     ret += sscanf(line, "UseSGSModel = %"ISYM, &UseSGSModel);
+    ret += sscanf(line, "UseSGSDiffusion = %"ISYM, &UseSGSDiffusion);
+    ret += sscanf(line, "SGSEnergies = %"ISYM, &SGSEnergies);
     ret += sscanf(line, "SGSFilterStencil = %"ISYM, &SGSFilterStencil);
     ret += sscanf(line, "SGSFilterWidth = %"FSYM, &SGSFilterWidth);
     ret += sscanf(line, "SGSFilterWeights = %"FSYM"%"FSYM"%"FSYM"%"FSYM,
@@ -596,6 +608,8 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
     ret += sscanf(line, "SGScoeffNLu = %"FSYM, &SGScoeffNLu);
     ret += sscanf(line, "SGScoeffNLuNormedEnS2Star = %"FSYM, &SGScoeffNLuNormedEnS2Star);
     ret += sscanf(line, "SGScoeffNLb =%"FSYM, &SGScoeffNLb);
+    ret += sscanf(line, "SGScoeffNLe =%"FSYM, &SGScoeffNLe);
+    ret += sscanf(line, "SGScoeffNLm =%"FSYM, &SGScoeffNLm);
     ret += sscanf(line, "SGScoeffSSu = %"FSYM, &SGScoeffSSu);
     ret += sscanf(line, "SGScoeffSSb =%"FSYM, &SGScoeffSSb);
     ret += sscanf(line, "SGScoeffSSemf = %"FSYM, &SGScoeffSSemf);
@@ -1478,8 +1492,9 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
     if (strstr(line, "UseMetals")           ) ret++;
     if (strstr(line, "InitialTemperature")  ) ret++;
     if (strstr(line, "InitialDensity")      ) ret++;
-    if (strstr(line, "InitialMagnField")    ) ret++;
-    
+    if (strstr(line, "InitialMagnField")    ) ret++;    
+    if (strstr(line, "CloudWind")           ) ret++;
+
     if (strstr(line, "\"\"\"")              ) comment_count++;
 
     /* if the line is suspicious, issue a warning */
@@ -1554,7 +1569,8 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
       SGScoeffNLemfCompr != 0. ||
       SGScoeffNLu != 0. ||
       SGScoeffNLuNormedEnS2Star != 0. ||
-      SGScoeffNLb != 0.)
+      SGScoeffNLb != 0. ||
+      SGScoeffNLe != 0. )
 
       SGSNeedJacobians = 1;
 

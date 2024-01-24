@@ -161,7 +161,8 @@ EXTERN int FastSiblingLocatorEntireDomain;
 			 11 = FlagCellsToBeRefinedByResistiveLength
                          12 = FlagCellsToBeRefinedByMustRefineRegion
 			 13 = FlagCellsToBeRefinedByMetallicity
-       15 = FlagCellsToBeRefinedBySecondDerivative
+			 15 = FlagCellsToBeRefinedBySecondDerivative
+                         17 = FlagCellsToBeRefinedByVorticity
  */
 
 EXTERN int CellFlaggingMethod[MAX_FLAGGING_METHODS];
@@ -191,6 +192,10 @@ EXTERN int MetallicityRefinementMinLevel;
 /* threshold metallicity and density for FlagGridCellsToBeRefinedByMetallicity */
 EXTERN float MetallicityRefinementMinMetallicity;
 EXTERN float MetallicityRefinementMinDensity;
+
+/* WS: minimal thresholds for refinement by grid variability */
+EXTERN float ThreshMin[MAX_FLAGGING_METHODS];
+EXTERN float ThreshFct[MAX_FLAGGING_METHODS];
 
 /* Velocity to limit timesteps */
 
@@ -286,6 +291,8 @@ EXTERN int PointSourceGravity;
 EXTERN FLOAT PointSourceGravityPosition[MAX_DIMENSION];
 EXTERN float PointSourceGravityConstant;
 EXTERN float PointSourceGravityCoreRadius;
+EXTERN float PointSourceGravityCutoffRadius; // LI/WS for the moving subcluster
+EXTERN float CloudWindCentralDensity;                                                                                                                       
 
 /* disk gravity */
 EXTERN int DiskGravity;
@@ -403,6 +410,8 @@ EXTERN float DrivenFlowDomainLength[MAX_DIMENSION];
 
 /* Subgrid-scale model variables */
 EXTERN int UseSGSModel;
+EXTERN int UseSGSDiffusion;
+EXTERN int SGSEnergies;
 EXTERN int SGSFilterStencil;
 EXTERN int SGSNeedJacobians;
 EXTERN int SGSNeedMixedFilteredQuantities;
@@ -415,6 +424,8 @@ EXTERN float SGScoeffNLemfCompr;
 EXTERN float SGScoeffNLu;
 EXTERN float SGScoeffNLuNormedEnS2Star;
 EXTERN float SGScoeffNLb;
+EXTERN float SGScoeffNLe;
+EXTERN float SGScoeffNLm;
 EXTERN float SGScoeffSSu;
 EXTERN float SGScoeffSSb;
 EXTERN float SGScoeffSSemf;

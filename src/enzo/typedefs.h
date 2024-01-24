@@ -220,6 +220,9 @@ const enum_type
   SGSZY  = 4,
   SGSZX  = 5;
 
+enum {X,Y,Z};
+enum {XX,XY,YX,YY,ZX,ZY,XZ,YZ,ZZ}; 
+
 /* These are the different types of fluid boundary conditions. */
 
 const boundary_type

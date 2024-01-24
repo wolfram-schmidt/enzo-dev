@@ -200,6 +200,7 @@ class grid
   int   *FlaggingField;             // Boolean flagging field (for refinement)
   float *MassFlaggingField;         // Used by mass flagging criteria
   float *ParticleMassFlaggingField; // Used by particle mass flagging criteria
+  float *ControlVariable[MAX_FLAGGING_METHODS]; // Used by variability flagging criteria
 //
 //  Parallel Information
 //
@@ -882,7 +883,6 @@ gradient force to gravitational force for one-zone collapse test. */
 
    int SetFlaggingField(int &NumberOfFlaggedCells, int level);
 
-
 /* Set flagging field from refine regions */
 
    int SetFlaggingFieldMultiRefineRegions(int level);
@@ -894,6 +894,10 @@ gradient force to gravitational force for one-zone collapse test. */
 /* Delete flagging field */
 
    void DeleteFlaggingField();
+
+/* WS: control variables for refinement by variability */
+
+   int ComputeControlVariables(int &active_zones, float* sum, float* sum_of_sqrs);
 
 /* Particles: deposit particles living in this grid into the Mass Flagging
              field (gg #2) */
@@ -967,6 +971,14 @@ gradient force to gravitational force for one-zone collapse test. */
 /* Flag all points that require refining by Shear. */
 
    int FlagCellsToBeRefinedByShear();
+
+/* Flag all points that require refining by Vorticity. */
+
+   int FlagCellsToBeRefinedByVorticity();
+
+/* Flag all cells in which the control variables exceed their variability thresholds. */
+
+   int FlagCellsToBeRefinedByVariability(int level);
 
 /* Flag all cells for which tcool < dx/sound_speed. */
 
@@ -2071,6 +2083,20 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
                            float KHOuterPressure,
                            float KHRampWidth);
 
+  /* LI: Initialize a grid for the Moving Subcluster problem.  */
+
+  int CloudWindInitializeGrid(float CloudWindVelocity,
+			      float CloudWindCutoffRadius,
+			      float CloudWindCentralDensity,
+			      float CloudWindExternalDensity,
+			      float CloudWindExternalTotalEnergy,
+			      float CloudWindCentralTotalEnergy,
+			      float CloudWindBeta,
+			      float CloudWindMetallicity,
+			      int   CloudWindUseMetallicityField,
+			      float CloudWindHSETolerance,
+			      int   CloudWindUnbound);
+
   /* Initialize a grid and set boundary for the 2D/3D Noh problem. */
 
   int NohInitializeGrid(float d0, float p0, float u0);
@@ -2572,22 +2598,32 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
     float *JacVel[MAX_DIMENSION][MAX_DIMENSION];
     float *JacB[MAX_DIMENSION][MAX_DIMENSION];
 
+    // Gradients to be used in SGS model
+    float *GradEint[MAX_DIMENSION];
+    float *GradSpec[MAX_SPECIES][MAX_DIMENSION];
+
     float *FilteredFields[7]; // filtered fields: rho, xyz-vel, Bxyz
-    
+    float *AuxField; // auxiliary field    
+
     // the scale-similarity model needs mixed filtered quantities
     float *FltrhoUU[6];
     float *FltBB[6];
     float *FltUB[3];
 
+    int SGSUtil_ComputeGradient(float *Grad[MAX_DIMENSION],float *field); 
     int SGSUtil_ComputeJacobian(float *Jac[][MAX_DIMENSION],float* field1,float* field2,float* field3);
     int SGSUtil_ComputeMixedFilteredQuantities();
     int SGSUtil_FilterFields();
-    
+    int SGSUtil_InternalEnergy();
+
     // the general functions that add the SGS terms to the dynamic eqns.
+    int SGS_AddDiffusionTerms(float **dU);
     int SGS_AddEMFTerms(float **dU);
     int SGS_AddMomentumTerms(float **dU);
     
     // the different SGS models
+    void SGS_AddDiff_nonlinear_energy(float **Flux);
+    void SGS_AddDiff_nonlinear_species(float **Flux, int s);
     void SGS_AddEMF_eddy_resistivity(float **EMF);
     void SGS_AddEMF_nonlinear_compressive(float **EMF);
     void SGS_AddMom_nonlinear_kinetic(float **Tau);
@@ -2599,6 +2635,98 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
     void SGS_AddEMF_scale_similarity(float **EMF);
     
     /* END Subgrid-scale modeling framework by P. Grete */
+
+    /* START Control variables framework for refinment by W. Schmidt */
+
+    float ControlVariableAve[MAX_FLAGGING_METHODS];
+    float ControlVariableVar[MAX_FLAGGING_METHODS];
+
+    float *JacVelWeight[MAX_DIMENSION*MAX_DIMENSION];
+                                                                                                                                             
+    /**                                                                                                                                                                    
+     * Computes delta x for the fields for each direction                                                                                                                  
+     *                                                                                                                                                                     
+     * @param direction 0=x,1=y,2=z, (integer)                                                                                                                             
+     * @return delta x (float)                                                                                                                                             
+     */
+    inline float ComputeDelta(const int direction) const
+    {
+      if (direction>=0 && direction<GridRank)
+	  return (GridRightEdge[direction]- GridLeftEdge[direction]) / (GridEndIndex[direction] - GridStartIndex[direction] + 1);
+      else
+	  return -1.0;
+    }
+
+    /**                                                                                                                                                                    
+     * Returns the derivative at point x;                                                                                                                                  
+     * uses a 2-point symmetric method (Accuracy: O(dx)^2) which                                                                                                           
+     * uses the one point before point x and one point after point x                                                                                                       
+     *                                                                                                                                                                     
+     * @param xplus1 (float)                                                                                                                                               
+     * @param xminus1 (float)                                                                                                                                              
+     * @param dx (float)                                                                                                                                                   
+     *                                                                                                                                                                     
+     * @return returns the derivative at point x (float)                                                                                                                   
+     */
+    inline float deriv2(const float xplus1, const float xminus1, const float dx) const
+    {
+      return (xplus1-xminus1)/(2*dx);
+    }
+
+    /**                                                                                                                                                                    
+     * Returns the derivative at point x;                                                                                                                                  
+     * uses a 4-point symmetric method (Accuracy: O(dx)^4) which                                                                                                           
+     * uses the two points before point x and two points after point x                                                                                                     
+     *                                                                                                                                                                     
+     * @param xplus2 (float)                                                                                                                                               
+     * @param xplus1 (float)                                                                                                                                               
+     * @param xminus1 (float)                                                                                                                                              
+     * @param xminus2 (float)                                                                                                                                              
+     * @param dx (float)                                                                                                                                                   
+     *                                                                                                                                                                     
+     * @return returns the derivative at point x (float)                                                                                                                   
+     */
+    inline float deriv4(const float xplus2, const float xplus1, const float xminus1, const float xminus2,const float dx) const
+    {
+      return  (-xplus2+8*xplus1-8*xminus1+xminus2)/(12*dx);
+    }
+
+    /**                                                                                                                                                                    
+     * Returns the 2nd derivative at point x;                                                                                                                              
+     * uses a 5-point symmetric method (Accuracy: O(dx)^4) which                                                                                                           
+     * uses the two points before point x, point x and two points after point x                                                                                            
+     *                                                                                                                                                                     
+     * @param xplus2 (float)                                                                                                                                               
+     * @param xplus1 (float)                                                                                                                                               
+     * @param x (float)                                                                                                                                                    
+     * @param xminus1 (float)                                                                                                                                              
+     * @param xminus2 (float)                                                                                                                                              
+     * @param dx (float)                                                                                                                                                   
+     *                                                                                                                                                                     
+     * @return returns the 2nd derivative at point x (float)                                                                                                               
+     */
+    inline float dderiv4(const float xplus2, const float xplus1, const float x, const float xminus1, const float xminus2, const float dx) const
+    {
+      return  (-xplus2+16*xplus1-30*x+16*xminus1-xminus2)/(12*dx*dx);
+    }
+
+    // Member functions defined in Grid_ComputeJacobianVelocity.C
+
+    int ComputeJacobianVelocity(int weighing);
+    int ComputeJacobianVelocityNormSqr(float* JacVelNormSqr);
+    int ComputeNonLinearSGSEnergy(float* SGSEnergy);
+    int ComputeNonLinearScalar(float* NonLinScalar);
+    int ComputeRateOfStrainNormSqr(float* STNormSqr, int tracefree);
+    int ComputeVorticityNormSqr(float* VortNormSqr);
+    int ComputeDivergence(float* Div);
+
+    // Member functions defined in Grid_ComputeRateOfCompression.C                                                                                                         
+
+    int ComputeRateOfCompression(float* RateOfCompression);
+    int ComputeDivAcceleration(float* div, float* delta);
+    int ComputeDivInvRhoGradPressure(float* div, float* delta);
+
+    /* END Control variables framework for refinment by W. Schmidt */
 
 /* Comoving coordinate expansion terms. */
 

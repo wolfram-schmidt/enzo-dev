@@ -66,6 +66,7 @@ grid::grid()
     RandomForcingField[i]            = NULL;
     PhaseFctMultEven[i]              = NULL; // WS
     PhaseFctMultOdd[i]               = NULL; // WS
+    GradEint[i]                      = NULL;
   }
   PhaseFctInitEven = NULL; // WS
   PhaseFctInitOdd  = NULL; // WS
@@ -77,6 +78,11 @@ grid::grid()
         JacB[i][j] = NULL;
       }
 
+    for (i = 0; i < MAX_SPECIES; i++) 
+      for (j = 0; j < MAX_DIMENSION; j++) {
+        GradSpec[i][j] = NULL;
+      }
+
     for (i = 0; i < 7; i++)
       FilteredFields[i] = NULL;
 
@@ -86,6 +92,12 @@ grid::grid()
     }
     for (i = 0; i < 3; i++) 
       FltUB[i] = NULL;
+
+    AuxField = NULL;
+  }
+
+  for (i = 0; i < MAX_DIMENSION*MAX_DIMENSION; i++) { // WS
+    JacVelWeight[i] = NULL;
   }
 
   ParticleAcceleration[MAX_DIMENSION]      = NULL;
@@ -136,6 +148,9 @@ grid::grid()
   ParticleMassFlaggingField     = NULL;
   MassFlaggingField             = NULL;
   FlaggingField                 = NULL;
+  for (i = 0; i < MAX_FLAGGING_METHODS; i++) { // WS
+    ControlVariable[i] = NULL;
+  }
 
 #ifdef TRANSFER
   NumberOfPhotonPackages = 0;

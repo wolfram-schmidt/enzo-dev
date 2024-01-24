@@ -58,6 +58,7 @@ grid::~grid()
     delete [] RandomForcingField[i];
     if (PhaseFctMultEven[i] != NULL) delete[] PhaseFctMultEven[i];
     if (PhaseFctMultOdd[i] != NULL) delete[] PhaseFctMultOdd[i];
+    if (GradEint[i] != NULL) delete[] GradEint[i];
   }
  
   if (PhaseFctInitEven != NULL) delete[] PhaseFctInitEven;
@@ -74,6 +75,15 @@ grid::~grid()
         if (JacB[i][j] != NULL) {
           delete [] JacB[i][j];
           JacB[i][j] = NULL;
+        }
+      }
+    }
+
+    for (i = 0; i < MAX_SPECIES; i++) {
+      for (j = 0; j < MAX_DIMENSION; j++) {
+        if (GradSpec[i][j] != NULL) {
+          delete [] GradSpec[i][j];
+          GradSpec[i][j] = NULL;
         }
       }
     }
@@ -99,6 +109,12 @@ grid::~grid()
         delete [] FltUB[i];
       FltUB[i] = NULL;
     }
+
+    if (AuxField != NULL) delete[] AuxField;
+  }
+
+  for (i = 0; i < MAX_DIMENSION*MAX_DIMENSION; i++) { /// WS
+    if (JacVelWeight[i] != NULL) delete[] JacVelWeight[i];
   }
 
   delete ParticleAcceleration[MAX_DIMENSION];
@@ -130,7 +146,11 @@ grid::~grid()
   delete [] FlaggingField;
   delete [] MassFlaggingField;
   delete [] ParticleMassFlaggingField;
- 
+
+  for (i = 0; i < MAX_FLAGGING_METHODS; i++) { // WS
+    if (ControlVariable[i] != NULL) delete[] ControlVariable[i];
+  }
+
   for (i = 0; i < MAX_NUMBER_OF_PARTICLE_ATTRIBUTES; i++)
     delete [] ParticleAttribute[i];
 

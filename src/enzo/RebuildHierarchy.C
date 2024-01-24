@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <iostream>
 
 #include "EnzoTiming.h" 
 #include "ErrorExceptions.h"
@@ -36,6 +37,8 @@
 #include "Hierarchy.h"
 #include "LevelHierarchy.h"
 #include "CommunicationUtilities.h"
+
+using namespace std;
  
 /* function prototypes */
  
@@ -82,6 +85,8 @@ int SetSubgridMarker(TopGridData &MetaData,
 		     int UpdateReplicatedGridsOnly);
 #endif
 double ReturnWallTime(void);
+
+int ComputeControlVariables(HierarchyEntry *Grid, int level, int &active_zones, float* sum, float* sum_of_sqrs);
 
 void fpcol(Eflt64 *x, int n, int m, FILE *log_fptr);
 bool _first = true;
@@ -143,7 +148,12 @@ int RebuildHierarchy(TopGridData *MetaData,
       RHperf[i] = 0;
     _first = false;
   }
- 
+
+  // WS: control variable framework
+  int level_active_zones;
+  float level_sum[MAX_FLAGGING_METHODS];
+  float level_sum_of_sqrs[MAX_FLAGGING_METHODS];
+
 #ifdef MPI_INSTRUMENTATION
   double tmptime =  starttime;
   starttime = MPI_Wtime();
@@ -386,6 +396,50 @@ int RebuildHierarchy(TopGridData *MetaData,
 	GridHierarchyPointer[grids++] = Temp->GridHierarchyEntry;
 	Temp                          = Temp->NextGridThisLevel;
       }
+
+      /* 3b.0) START: Control variable framework by WS.
+         Loop over grids computing statistical moments of the
+         control variable for refinement by grid variability. */
+      
+      for (int method = 0; method < MAX_FLAGGING_METHODS; method++) {
+	level_active_zones = 0;
+	level_sum[method] = 0.0;
+	level_sum_of_sqrs[method] = 0.0;
+      }
+      
+      // sum over all grids on this level
+      for (j = 0; j < grids; j++) {
+	if (ComputeControlVariables(GridHierarchyPointer[j], i, level_active_zones, level_sum, level_sum_of_sqrs) == FAIL) {
+	  ENZO_FAIL("Error in ComputeControlVariables.");
+	}
+      }
+
+      // communicate sums
+      CommunicationAllSumValues(&level_active_zones, 1);
+      CommunicationAllSumValues(level_sum, MAX_FLAGGING_METHODS);
+      CommunicationAllSumValues(level_sum_of_sqrs, MAX_FLAGGING_METHODS);
+
+      // set average and variance for all grids if there are cells on this level
+      if (level_active_zones > 0) {
+	//cout << "[" << MyProcessorNumber << "] RebuilHierarchy, level = " << i << ", number active zones = " << level_active_zones << endl;
+	for (int method = 0; method < MAX_FLAGGING_METHODS; method++) {
+	  if (CellFlaggingMethod[method] >= MIN_METHOD_VARIABILITY && CellFlaggingMethod[method] <= MAX_METHOD_VARIABILITY) {
+	    for (j = 0; j < grids; j++) {
+	      GridHierarchyPointer[j]->GridData->ControlVariableAve[method] = level_sum[method]/level_active_zones;
+              // the following formular for the variance is sufficient because the resulting threshold will be given by the average 
+	      // if the fluctuation is small and the two terms (sum of squares and squared average) are comparable
+	      GridHierarchyPointer[j]->GridData->ControlVariableVar[method] = level_sum_of_sqrs[method]/level_active_zones - 
+	        GridHierarchyPointer[j]->GridData->ControlVariableAve[method] * GridHierarchyPointer[j]->GridData->ControlVariableAve[method];
+	      //cout << "[" << MyProcessorNumber << "] RebuilHierarchy, method " << CellFlaggingMethod[method] 
+	      //   << ", level = " << i << ", grid = " << j << ", " 
+	      //   << GridHierarchyPointer[j]->GridData->ControlVariableAve[method] << ", "
+	      //   << GridHierarchyPointer[j]->GridData->ControlVariableVar[method] << endl;
+	    }
+	  }
+	}
+      }
+
+      /* 3b.0) END: Control variable framework by WS.
 
       /* 3b.1) Loop over grids, creating the particle mass flagging
 	 field by considering particles on all processors.  They

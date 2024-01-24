@@ -83,6 +83,7 @@ OBJS_CONFIG_LIB = \
         cic_interp_c.o \
         cicinterp.o \
         cie_thin_cooling_rate.o \
+        CloudWindInitialize.o \
         cluster_maker.o \
         ClusterInitialize.o \
 	ClusterSMBHSumGasMass.o \
@@ -117,6 +118,7 @@ OBJS_CONFIG_LIB = \
         CommunicationUpdateStarParticleCount.o \
         CommunicationUtilities.o \
         ComputeDomainBoundaryMassFlux.o \
+	ComputeControlVariables.o \
 	ConductionBubbleInitialize.o \
 	ConductionCloudInitialize.o \
 	ConductionTestInitialize.o \
@@ -382,6 +384,7 @@ OBJS_CONFIG_LIB = \
 	Grid_ClearMassFlaggingField.o \
 	Grid_ClearParticleAccelerations.o \
 	Grid_ClearParticleMassFlaggingField.o \
+        Grid_CloudWindInitializeGrid.o \
 	Grid_ClusterInitializeGrid.o \
 	Grid_ClusterSMBHFeedback.o \
         Grid_ClusterSMBHEachGridGasMass.o \
@@ -409,6 +412,7 @@ OBJS_CONFIG_LIB = \
         Grid_ComputeAnisotropicCRDiffusion.o \
 	Grid_ComputeCellCenteredField.o \
 	Grid_ComputeConductionTimeStep.o \
+	Grid_ComputeControlVariables.o \
 	Grid_ComputeCoolingTime.o \
         Grid_ComputeCRDiffusion.o \
         Grid_ComputeCRDiffusionTimeStep.o \
@@ -421,11 +425,13 @@ OBJS_CONFIG_LIB = \
 	Grid_ComputeExternalNohBoundary.o \
 	Grid_ComputeGammaField.o \
         Grid_ComputeHeat.o \
+	Grid_ComputeJacobianVelocity.o \
 	Grid_ComputeLuminosity.o \
 	Grid_ComputeMetalLineLuminosity.o \
         Grid_ComputeOneZoneCollapseFactor.o \
 	Grid_ComputePressure.o \
-	Grid_ComputeRandomForcingFields.o\
+	Grid_ComputeRandomForcingFields.o \
+	Grid_ComputeRateOfCompression.o \
 	Grid_ComputeTemperatureField.o \
 	Grid_ComputeTimeStep.o \
         Grid_ComputeVectorAnalysisFields.o \
@@ -503,6 +509,8 @@ OBJS_CONFIG_LIB = \
 	Grid_FlagCellsToBeRefinedByShockwaves.o \
 	Grid_FlagCellsToBeRefinedBySlope.o \
 	Grid_FlagCellsToBeRefinedBySecondDerivative.o \
+	Grid_FlagCellsToBeRefinedByVariability.o \
+	Grid_FlagCellsToBeRefinedByVorticity.o \
 	Grid_FlagRefinedCells.o \
 	Grid_FlagGridArray.o \
 	Grid_FreeExpansionInitializeGrid.o \
@@ -1031,6 +1039,7 @@ OBJS_CONFIG_LIB = \
    Grid_DrivenFlowInitializeGrid.o \
    Grid_Phases.o \
    Grid_SGSUtilities.o \
+   Grid_SGSAddDiffusionTerms.o \
    Grid_SGSAddEMFTerms.o \
    Grid_SGSAddMomentumTerms.o \
    LightBosonInitialize.o \

@@ -75,6 +75,8 @@
 #define GRAVITY_BUFFER_SIZE                 3
 
 #define MAX_FLAGGING_METHODS                9
+#define MIN_METHOD_VARIABILITY             20
+#define MAX_METHOD_VARIABILITY             22
 
 #define MAX_STATIC_REGIONS               1000
 
@@ -107,6 +109,8 @@
 #define VERSION                             2.6  /* current version number */
 
 #define NUMBER_ENZO_PARTICLE_TYPES           3  /* Dark Matter, Stars, Active Particles */
+
+#define MAX_SPECIES                        12
 
 /* Unmodifiable Parameters */
 

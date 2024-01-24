@@ -257,7 +257,15 @@ int grid::SetFlaggingField(int &NumberOfFlaggedCells, int level)
 	}
 	break;
 	
-	/* ==== METHOD 17: undefined ==== */
+	/* ==== METHOD 17: BY VORTICITY ==== */
+
+      case 17:
+
+        NumberOfFlaggedCells = this->FlagCellsToBeRefinedByVorticity();
+        if (NumberOfFlaggedCells < 0) {
+          ENZO_FAIL("Error in grid->FlagCellsToBeRefinedByVorticity.");
+        }
+        break;
 	
 	/* ==== METHOD 18: BY POSITION OF MUST-REFINE PARTICLES ONLY ABOVE A CERTAIN MASS  ==== */
       case 18:
@@ -277,6 +285,17 @@ int grid::SetFlaggingField(int &NumberOfFlaggedCells, int level)
 	  fprintf(stderr, "Error in grid->FlagCellsToBeRefinedByMetalMass.\n");
 	  return FAIL;
 	}
+	break;
+
+        /* ==== DUMMIES for grid variability methods in range MIN_METHOD_VARIABILITY to MAX_METHOD_VARIABILITY ==== */
+
+      case 20:
+	break;
+
+      case 21:
+	break;
+
+      case 22:
 	break;
 	
 	/* ==== METHOD 100: UNDO REFINEMENT IN SOME REGIONS ==== */
@@ -308,6 +327,15 @@ int grid::SetFlaggingField(int &NumberOfFlaggedCells, int level)
 	       CellFlaggingMethod[method], NumberOfFlaggedCells);
     } 
   } // ENDFOR methods
+
+  /* ==== REFINEMENT BY GRID VARIABILITY (loops through methods) ==== */
+
+  NumberOfFlaggedCells = this->FlagCellsToBeRefinedByVariability(level);
+  if (NumberOfFlaggedCells < 0) {
+    fprintf(stderr, "Error in grid->FlagCellsToBeRefinedByVariability.\n");
+    return FAIL;
+  }
+
  
   /* End of Cell flagging criterion routine                              */
   /***********************************************************************/

@@ -223,7 +223,25 @@ int grid::ComputeAccelerationFieldExternal()
 	      //	      accel = PointSourceGravityConstant/(xpos*xpos + a2);
 	      accel = PointSourceGravityConstant/(rsquared + a2);
 	      //	      fprintf(stderr, "%g %g %g\n", xpos, accel, AccelUnits);
-	    }  else {
+
+	    }  else if (PointSourceGravity == 4){
+	      /* (4) King profile for the cloud in a wind - LI/WS */
+	      rcore = max(0.1*CellWidth[0][0], PointSourceGravityCoreRadius);
+	      FLOAT x = POW(rcubed, FLOAT(1.0/3.0))/rcore;
+	      rcubed /= (rcore*rcore*rcore * (-x / sqrt(1 + x*x)
+                                              + log(x + sqrt(1 + x*x))));
+
+	      /* the DM central density is assumed to be 10 * gas-density */
+	      /* use gravity only inside the subcluster */
+	      //FLOAT rout = rcore; // * 2.0;                                                                                                                                                      
+	      //if (rcubed < rout*rout*rout)                                                                                                                                                       
+	      if(x < PointSourceGravityCutoffRadius) {
+		accel = PointSourceGravityConstant * (CloudWindCentralDensity * 10.0) /
+		  (rcubed * a);
+	      }
+	      else accel = 0.0;
+
+            }  else {
 	      /* this is only reached if there are two types of point sources - 
 		 when you add a new one, this changes */
 	      ENZO_FAIL("should never get here! in Grid::ComputeAccelFieldExternal");

@@ -359,7 +359,7 @@ int grid::Group_WriteGrid(FILE *fptr, char *base_name, int grid_id, HDF5_hid_t f
 
     if (VelAnyl==1){
 
-      float *curl_x, *curl_y, *curl_z, *div;
+        float *compr, *curl_x, *curl_y, *curl_z, *div, *sgs_energy;
 
         this->ComputeVectorAnalysisFields(Velocity1, Velocity2, Velocity3,
             curl_x, curl_y, curl_z, div);
@@ -370,10 +370,37 @@ int grid::Group_WriteGrid(FILE *fptr, char *base_name, int grid_id, HDF5_hid_t f
             group_id, file_type_id, (VOIDP) curl_z, TRUE, temp);
 
         if (GridRank==3){
+
+	  compr = new float[size];
+
+	  if (this->ComputeJacobianVelocity(0) == FAIL) {
+	    fprintf(stderr, "Error in grid->ComputeJacobianVelocity.\n");
+	    return FAIL;
+	  }
+
+	  if (SGSEnergies) {
+	    sgs_energy = new float[size];
+
+	    if (this->ComputeNonLinearSGSEnergy(sgs_energy) == FAIL) {
+	      fprintf(stderr, "Error in grid->ComputeNonLinearSGSEnergy.\n");
+	      return FAIL;
+	    }
+	  }
+
+	  if (this->ComputeRateOfCompression(compr) == FAIL) {
+	    fprintf(stderr, "Error in grid->ComputeRateOfCompression.\n");
+	    return FAIL;
+	  }
+
           this->write_dataset(GridRank, OutDims, "Velocity_Vorticity1",
               group_id, file_type_id, (VOIDP) curl_x, TRUE, temp);
           this->write_dataset(GridRank, OutDims, "Velocity_Vorticity2",
               group_id, file_type_id, (VOIDP) curl_y, TRUE, temp);
+          this->write_dataset(GridRank, OutDims, "Velocity_Compression",
+              group_id, file_type_id, (VOIDP) compr, TRUE, temp);
+	  if (SGSEnergies)
+	    this->write_dataset(GridRank, OutDims, "SGS_Energy",
+		group_id, file_type_id, (VOIDP) sgs_energy, TRUE, temp);
         }
 
         delete [] curl_z;
@@ -381,6 +408,9 @@ int grid::Group_WriteGrid(FILE *fptr, char *base_name, int grid_id, HDF5_hid_t f
         if(GridRank==3){
           delete [] curl_x;
           delete [] curl_y;
+	  delete [] compr;
+	  if (SGSEnergies)
+	    delete [] sgs_energy;
         }
     }
 

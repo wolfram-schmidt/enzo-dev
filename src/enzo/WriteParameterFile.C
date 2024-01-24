@@ -325,6 +325,10 @@ int WriteParameterFile(FILE *fptr, TopGridData &MetaData, char *name = NULL)
 	  MaximumParticleRefinementLevel);
   fprintf(fptr, "CellFlaggingMethod             = ");
   WriteListOfInts(fptr, MAX_FLAGGING_METHODS, CellFlaggingMethod);
+  fprintf(fptr, "ThreshMin              = "); // WS                                                                                         
+  WriteListOfFloats(fptr, MAX_FLAGGING_METHODS, ThreshMin);
+  fprintf(fptr, "ThreshFct              = "); // WS
+  WriteListOfFloats(fptr, MAX_FLAGGING_METHODS, ThreshFct);
   for (int i = 0; i<EnabledActiveParticlesCount; i++){
     fprintf(fptr, "AppendActiveParticleType = %s\n",
             EnabledActiveParticles[i]->particle_name.c_str());
@@ -451,6 +455,9 @@ int WriteParameterFile(FILE *fptr, TopGridData &MetaData, char *name = NULL)
 	  PointSourceGravityConstant);
   fprintf(fptr, "PointSourceGravityCoreRadius = %"GSYM"\n\n",
 	  PointSourceGravityCoreRadius);
+  fprintf(fptr, "PointSourceGravityCutoffRadius = %"GSYM"\n\n",
+          PointSourceGravityCutoffRadius); // LI/WS for the moving subcluster                                                                                                                     
+  fprintf(fptr, "CloudWindCentralDensity        = %"GSYM"\n", CloudWindCentralDensity);
 
   fprintf(fptr, "DiskGravity                        = %"ISYM"\n",DiskGravity);
   fprintf(fptr, "DiskGravityPosition                = ");
@@ -529,6 +536,8 @@ int WriteParameterFile(FILE *fptr, TopGridData &MetaData, char *name = NULL)
   if (DrivenFlowProfile)
     Forcing.WriteParameters(fptr);
   fprintf(fptr, "UseSGSModel                    = %"ISYM"\n", UseSGSModel);
+  fprintf(fptr, "UseSGSDiffusion                = %"ISYM"\n", UseSGSDiffusion);
+  fprintf(fptr, "SGSEnergies                    = %"ISYM"\n", SGSEnergies);
   fprintf(fptr, "SGSFilterWidth                 = %"FSYM"\n", SGSFilterWidth);
   fprintf(fptr, "SGSFilterStencil               = %"ISYM"\n", SGSFilterStencil);
   fprintf(fptr, "SGSFilterWeights               = %"FSYM" %"FSYM" %"FSYM" %"FSYM"\n",
@@ -540,6 +549,8 @@ int WriteParameterFile(FILE *fptr, TopGridData &MetaData, char *name = NULL)
   fprintf(fptr, "SGScoeffNLu                    = %"FSYM"\n", SGScoeffNLu);
   fprintf(fptr, "SGScoeffNLuNormedEnS2Star      = %"FSYM"\n", SGScoeffNLuNormedEnS2Star);
   fprintf(fptr, "SGScoeffNLb                    = %"FSYM"\n", SGScoeffNLb);
+  fprintf(fptr, "SGScoeffNLe                    = %"FSYM"\n", SGScoeffNLe);
+  fprintf(fptr, "SGScoeffNLm                    = %"FSYM"\n", SGScoeffNLm);
   fprintf(fptr, "use_grackle                 = %"ISYM"\n", use_grackle);
   fprintf(fptr, "RadiativeCooling               = %"ISYM"\n", RadiativeCooling);
   fprintf(fptr, "RadiativeCoolingModel          = %"ISYM"\n", RadiativeCoolingModel);

@@ -224,6 +224,8 @@ int SetDefaultGlobalValues(TopGridData &MetaData)
     MinimumSlopeForRefinement[i]= 0.3;
     SlopeFlaggingFields[i] = INT_UNDEFINED;
     CellFlaggingMethod[i]       = INT_UNDEFINED;
+    ThreshMin[i] = 0.0; //WS: minimal threshold for refinement
+    ThreshFct[i] = 1.0; //WS: threshold factor 
     MinimumMassForRefinement[i] = FLOAT_UNDEFINED;   // usually set by:
     MinimumOverDensityForRefinement[i]       = 1.5;
     MinimumMassForRefinementLevelExponent[i] = 0;
@@ -386,6 +388,8 @@ int SetDefaultGlobalValues(TopGridData &MetaData)
   PointSourceGravity           = FALSE;             // off
   PointSourceGravityConstant   = 1.0;
   PointSourceGravityCoreRadius = 0.0;
+  PointSourceGravityCutoffRadius = 0.0;            // LI/WS for the moving subcluster
+  CloudWindCentralDensity = 10.0;
 
   DiskGravity                        = FALSE;
   DiskGravityStellarDiskMass         = 1.0E11;      // Solar Masses
@@ -442,10 +446,12 @@ int SetDefaultGlobalValues(TopGridData &MetaData)
   }
 
   UseSGSModel = 0; // off
+  UseSGSDiffusion = 0; // off
+  SGSEnergies = 0; // compute and output energy variables
   SGSFilterStencil = 0; // the one-dimensional stencil of the complete filter 
   SGSNeedJacobians = 0; // set automatically in ReadParameter file 
   SGSNeedMixedFilteredQuantities = 0; // set automatically in ReadParameter file
-  SGSFilterWidth = 0.; // off, i.e. use grid-scale quantities
+  SGSFilterWidth = 1.; // off, i.e. use grid-scale quantities
   for (i = 0; i < 4; i++)
     // discrete filter weights of explicit filter
     SGSFilterWeights[i] = 0.;
@@ -456,6 +462,8 @@ int SetDefaultGlobalValues(TopGridData &MetaData)
   SGScoeffNLu = 0.0; // off
   SGScoeffNLuNormedEnS2Star = 0.0; // off
   SGScoeffNLb = 0.0; // off
+  SGScoeffNLe = 0.0; // off
+  SGScoeffNLm = 0.0; // off
 
   RadiativeCooling            = FALSE;             // off
   RadiativeCoolingModel       = 1;                 //1=cool_rates.in table lookup
