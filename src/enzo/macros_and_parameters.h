@@ -76,7 +76,7 @@
 
 #define MAX_FLAGGING_METHODS                9
 #define MIN_METHOD_VARIABILITY             20
-#define MAX_METHOD_VARIABILITY             22
+#define MAX_METHOD_VARIABILITY             23
 
 #define MAX_STATIC_REGIONS               1000
 

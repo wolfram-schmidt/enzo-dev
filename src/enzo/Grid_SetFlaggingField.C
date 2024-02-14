@@ -297,6 +297,9 @@ int grid::SetFlaggingField(int &NumberOfFlaggedCells, int level)
 
       case 22:
 	break;
+
+      case 23:
+	break;
 	
 	/* ==== METHOD 100: UNDO REFINEMENT IN SOME REGIONS ==== */
 	
@@ -317,25 +320,16 @@ int grid::SetFlaggingField(int &NumberOfFlaggedCells, int level)
 	break;
 	
       default:
-	ENZO_VFAIL("CellFlaggingMethod[%"ISYM"] = %"ISYM" unknown\n", method,
+		ENZO_VFAIL("CellFlaggingMethod[%"ISYM"] = %"ISYM" unknown\n", method,
 		   CellFlaggingMethod[method])
  
 	  }
 
       if (debug1 && NumberOfFlaggedCells > 0)
-	printf("SetFlaggingField[method = %"ISYM"]: NumberOfFlaggedCells = %"ISYM".\n",
+		printf("SetFlaggingField[method = %"ISYM"]: NumberOfFlaggedCells = %"ISYM".\n",
 	       CellFlaggingMethod[method], NumberOfFlaggedCells);
     } 
   } // ENDFOR methods
-
-  /* ==== REFINEMENT BY GRID VARIABILITY (loops through methods) ==== */
-
-  NumberOfFlaggedCells = this->FlagCellsToBeRefinedByVariability(level);
-  if (NumberOfFlaggedCells < 0) {
-    fprintf(stderr, "Error in grid->FlagCellsToBeRefinedByVariability.\n");
-    return FAIL;
-  }
-
  
   /* End of Cell flagging criterion routine                              */
   /***********************************************************************/
@@ -355,9 +349,10 @@ int grid::SetFlaggingField(int &NumberOfFlaggedCells, int level)
     }
   }
   
-  if (NumberOfFlaggedCells == INT_UNDEFINED) {
+  /* ==== REFINEMENT BY GRID VARIABILITY (loops through methods) ==== */
+  
+  if (this->FlagCellsToBeRefinedByVariability(level) < 0 && NumberOfFlaggedCells == INT_UNDEFINED)
     ENZO_FAIL("No valid CellFlaggingMethod specified.");
-  }
   
 #ifdef MPI_INSTRUMENTATION
   counter[4]++;

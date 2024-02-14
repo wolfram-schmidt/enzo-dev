@@ -357,61 +357,84 @@ int grid::Group_WriteGrid(FILE *fptr, char *base_name, int grid_id, HDF5_hid_t f
         }
     }
 
-    if (VelAnyl==1){
+    if (VelAnyl==1) {
 
-        float *compr, *curl_x, *curl_y, *curl_z, *div, *sgs_energy;
+      float *curl_x, *curl_y, *curl_z, *div;
 
-        this->ComputeVectorAnalysisFields(Velocity1, Velocity2, Velocity3,
-            curl_x, curl_y, curl_z, div);
+      this->ComputeVectorAnalysisFields(Velocity1, Velocity2, Velocity3,
+          curl_x, curl_y, curl_z, div);
 
-        this->write_dataset(GridRank, OutDims, "Velocity_Div",
-            group_id, file_type_id, (VOIDP) div, TRUE, temp);
-        this->write_dataset(GridRank, OutDims, "Velocity_Vorticity3",
-            group_id, file_type_id, (VOIDP) curl_z, TRUE, temp);
+      this->write_dataset(GridRank, OutDims, "Velocity_Div",
+          group_id, file_type_id, (VOIDP) div, TRUE, temp);
+      this->write_dataset(GridRank, OutDims, "Velocity_Vorticity3",
+          group_id, file_type_id, (VOIDP) curl_z, TRUE, temp);
+      if (GridRank==3) {
+        this->write_dataset(GridRank, OutDims, "Velocity_Vorticity1",
+            group_id, file_type_id, (VOIDP) curl_x, TRUE, temp);
+        this->write_dataset(GridRank, OutDims, "Velocity_Vorticity2",
+            group_id, file_type_id, (VOIDP) curl_y, TRUE, temp);
+      }
 
-        if (GridRank==3){
+      delete [] curl_z;
+      delete [] div;
+      if (GridRank==3) {
+        delete [] curl_x;
+        delete [] curl_y;
+      }
+    }
 
-	  compr = new float[size];
+    if (VelAnyl==2 || SGSEnergies) {
 
-	  if (this->ComputeJacobianVelocity(0) == FAIL) {
-	    fprintf(stderr, "Error in grid->ComputeJacobianVelocity.\n");
-	    return FAIL;
-	  }
-
-	  if (SGSEnergies) {
-	    sgs_energy = new float[size];
-
-	    if (this->ComputeNonLinearSGSEnergy(sgs_energy) == FAIL) {
-	      fprintf(stderr, "Error in grid->ComputeNonLinearSGSEnergy.\n");
+	    if (this->ComputeJacobianVelocity(0) == FAIL) {
+	      fprintf(stderr, "Error in grid->ComputeJacobianVelocity.\n");
 	      return FAIL;
 	    }
-	  }
 
-	  if (this->ComputeRateOfCompression(compr) == FAIL) {
-	    fprintf(stderr, "Error in grid->ComputeRateOfCompression.\n");
-	    return FAIL;
-	  }
+      float *buf = new float[size];
 
-          this->write_dataset(GridRank, OutDims, "Velocity_Vorticity1",
-              group_id, file_type_id, (VOIDP) curl_x, TRUE, temp);
-          this->write_dataset(GridRank, OutDims, "Velocity_Vorticity2",
-              group_id, file_type_id, (VOIDP) curl_y, TRUE, temp);
-          this->write_dataset(GridRank, OutDims, "Velocity_Compression",
-              group_id, file_type_id, (VOIDP) compr, TRUE, temp);
-	  if (SGSEnergies)
-	    this->write_dataset(GridRank, OutDims, "SGS_Energy",
-		group_id, file_type_id, (VOIDP) sgs_energy, TRUE, temp);
-        }
+	    if (this->ComputeDivergence(buf) == FAIL) {
+	      fprintf(stderr, "Error in grid->ComputeDivergence.\n");
+	      return FAIL;
+	    }
 
-        delete [] curl_z;
-        delete [] div;
-        if(GridRank==3){
-          delete [] curl_x;
-          delete [] curl_y;
-	  delete [] compr;
-	  if (SGSEnergies)
-	    delete [] sgs_energy;
-        }
+      this->write_dataset(GridRank, OutDims, "Velocity_Divergence",
+          group_id, file_type_id, (VOIDP) buf, TRUE, temp);
+
+	    if (this->ComputeRateOfStrainNormSqr(buf, 1) == FAIL) {
+	      fprintf(stderr, "Error in grid->ComputeRateOfStrainNormSqr.\n");
+	      return FAIL;
+	    }
+
+      this->write_dataset(GridRank, OutDims, "Velocity_StrainNormSqr",
+          group_id, file_type_id, (VOIDP) buf, TRUE, temp);
+
+	    if (this->ComputeVorticityNormSqr(buf) == FAIL) {
+	      fprintf(stderr, "Error in grid->ComputeVorticityNormSqr.\n");
+	      return FAIL;
+	    }
+      
+      this->write_dataset(GridRank, OutDims, "Velocity_VorticityNormSqr",
+          group_id, file_type_id, (VOIDP) buf, TRUE, temp);
+
+	    if (this->ComputeRateOfCompression(buf) == FAIL) {
+	      fprintf(stderr, "Error in grid->ComputeRateOfCompression.\n");
+	      return FAIL;
+	    }
+
+      this->write_dataset(GridRank, OutDims, "Velocity_Compression",
+          group_id, file_type_id, (VOIDP) buf, TRUE, temp);
+
+	    if (GridRank==3 && SGSEnergies) {
+	      if (this->ComputeNonLinearSGSEnergy(buf) == FAIL) {
+	        fprintf(stderr, "Error in grid->ComputeNonLinearSGSEnergy.\n");
+	        return FAIL;
+	      }
+
+        this->write_dataset(GridRank, OutDims, "SGS_Energy",
+		    group_id, file_type_id, (VOIDP) buf, TRUE, temp);
+	    }
+
+      delete [] buf;
     }
 
     if (BAnyl==1){
@@ -461,7 +484,7 @@ int grid::Group_WriteGrid(FILE *fptr, char *base_name, int grid_id, HDF5_hid_t f
         delete [] DivB;
       }
     }
-
+    
 		/* If requested, write the External Acceleration field */
     if (WriteExternalAccel==1){
 				this->ComputeAccelerationFieldExternal();

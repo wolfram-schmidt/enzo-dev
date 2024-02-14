@@ -2612,6 +2612,7 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
 
     int SGSUtil_ComputeGradient(float *Grad[MAX_DIMENSION],float *field); 
     int SGSUtil_ComputeJacobian(float *Jac[][MAX_DIMENSION],float* field1,float* field2,float* field3);
+    int SGSUtil_ComputeJacobianNormSqr(float *JacNormSqr, float *Jac[][MAX_DIMENSION]);
     int SGSUtil_ComputeMixedFilteredQuantities();
     int SGSUtil_FilterFields();
     int SGSUtil_InternalEnergy();
