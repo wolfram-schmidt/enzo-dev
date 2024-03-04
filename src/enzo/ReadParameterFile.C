@@ -1490,6 +1490,7 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
     if (strstr(line, "UseParticles")        ) ret++;
     if (strstr(line, "UseGas")              ) ret++;
     if (strstr(line, "UseMetals")           ) ret++;
+    if (strstr(line, "UseCGM")              ) ret++;
     if (strstr(line, "InitialTemperature")  ) ret++;
     if (strstr(line, "InitialDensity")      ) ret++;
     if (strstr(line, "InitialMagnField")    ) ret++;    

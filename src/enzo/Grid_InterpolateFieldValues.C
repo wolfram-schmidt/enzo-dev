@@ -368,6 +368,9 @@ int grid::InterpolateFieldValues(grid *ParentGrid
 				  &FieldInterpolationMethod,
 				  &SecondOrderBFlag[field], &interp_error);
 	if (interp_error) {
+    //printf("Field %d ", FieldType[field]);
+    //printf(DataLabel[field]);
+    //printf("\n");
 	  printf("P%d: Error interpolating field %d (%s).\n"
 		     "ParentGrid ID = %d\n"
 		     "\t LeftEdge  = %"PSYM" %"PSYM" %"PSYM"\n"

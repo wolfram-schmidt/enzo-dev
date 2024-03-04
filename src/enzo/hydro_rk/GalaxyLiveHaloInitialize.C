@@ -80,6 +80,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
   int UseParticles  = TRUE;
   int UseGas        = TRUE;
   int UseMetals     = FALSE;
+  int UseCGM        = FALSE;
 
   float InitialTemperature = 1e4;  // 10.000 K
   float InitialDensity     = 1e-3; // in code units
@@ -90,6 +91,14 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
         DiskBeta[MAX_SPHERES],
         DiskMetallicity[MAX_SPHERES],
         DiskMetallicityScale[MAX_SPHERES];
+
+  float CGMCentralDensity[MAX_SPHERES],
+        CGMCoreRadius[MAX_SPHERES],
+        CGMMetallicity[MAX_SPHERES];
+
+  float LiveHaloMass[MAX_SPHERES],
+        LiveHaloScaleLength[MAX_SPHERES],
+        LiveHaloVirialRadius[MAX_SPHERES];    
 
   float DiskPosition[MAX_SPHERES][MAX_DIMENSION],
         DiskRotAxis[MAX_SPHERES][MAX_DIMENSION],
@@ -103,8 +112,14 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
   for (sphere = 0; sphere < MAX_SPHERES; sphere++) {
     DiskTemperature[sphere]      = InitialTemperature;
     DiskBeta[sphere]             = huge_number; // hydrodynamical
-    DiskMetallicity[sphere]      = 0;
-    DiskMetallicityScale[sphere] = 0;
+    DiskMetallicity[sphere]      = 0.0;
+    DiskMetallicityScale[sphere] = 0.0;
+    CGMCentralDensity[sphere]    = 0.0;
+    CGMCoreRadius[sphere]        = 0.0;
+    CGMMetallicity[sphere]       = 0.0;
+    LiveHaloMass[sphere]         = 0.0;
+    LiveHaloScaleLength[sphere]  = 0.0;
+    LiveHaloVirialRadius[sphere] = 0.0;
 
     /* disk at rest centered in box */
 
@@ -134,6 +149,8 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
                   &UseGas);
     ret += sscanf(line, "UseMetals = %"ISYM,
                   &UseMetals);
+    ret += sscanf(line, "UseCGM = %"ISYM,
+                  &UseCGM);
     ret += sscanf(line, "InitialTemperature = %"FSYM,
                   &InitialTemperature);
     ret += sscanf(line, "InitialDensity = %"FSYM,
@@ -155,6 +172,24 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
     if (sscanf(line, "DiskRadius[%"ISYM"]", &sphere) > 0)
         ret += sscanf(line, "DiskRadius[%"ISYM"] = %"FSYM, &sphere,
                       &DiskRadius[sphere]);
+    if (sscanf(line, "CGMCentralDensity[%"ISYM"]", &sphere) > 0)
+        ret += sscanf(line, "CGMCentralDensity[%"ISYM"] = %"FSYM, &sphere,
+                      &CGMCentralDensity[sphere]);
+    if (sscanf(line, "CGMCoreRadius[%"ISYM"]", &sphere) > 0)
+        ret += sscanf(line, "CGMCoreRadius[%"ISYM"] = %"FSYM, &sphere,
+                      &CGMCoreRadius[sphere]);
+    if (sscanf(line, "CGMMetallicity[%"ISYM"]", &sphere) > 0)
+        ret += sscanf(line, "CGMMetallicity[%"ISYM"] = %"FSYM, &sphere,
+                      &CGMMetallicity[sphere]);
+    if (sscanf(line, "LiveHaloMass[%"ISYM"]", &sphere) > 0)
+        ret += sscanf(line, "LiveHaloMass[%"ISYM"] = %"FSYM, &sphere,
+                      &LiveHaloMass[sphere]);
+    if (sscanf(line, "LiveHaloScaleLength[%"ISYM"]", &sphere) > 0)
+        ret += sscanf(line, "LiveHaloScaleLength[%"ISYM"] = %"FSYM, &sphere,
+                      &LiveHaloScaleLength[sphere]);
+    if (sscanf(line, "LiveHaloVirialRadius[%"ISYM"]", &sphere) > 0)
+        ret += sscanf(line, "LiveHaloVirialRadius[%"ISYM"] = %"FSYM, &sphere,
+                      &LiveHaloVirialRadius[sphere]);
     if (sscanf(line, "DiskPosition[%"ISYM"]", &sphere) > 0)
         ret += sscanf(line, "DiskPosition[%"ISYM"] = %"PSYM" %"PSYM" %"PSYM,
                       &sphere,
@@ -247,12 +282,19 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
                     DiskBeta,
                     DiskMetallicity,
                     DiskMetallicityScale,
+                    CGMCentralDensity,
+                    CGMCoreRadius,
+                    CGMMetallicity,
+                    LiveHaloMass,
+                    LiveHaloScaleLength,
+                    LiveHaloVirialRadius,
                     InitialTemperature,
                     InitialDensity,
                     InitialMagnField,
                     UseParticles,
                     UseGas,
                     UseMetals,
+                    UseCGM,
                     0,
                     SetBaryonFields,
                     1) == FAIL) {
@@ -311,12 +353,19 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
                   DiskBeta,
                   DiskMetallicity,
                   DiskMetallicityScale,
+                  CGMCentralDensity,
+                  CGMCoreRadius,
+                  CGMMetallicity,
+                  LiveHaloMass,
+                  LiveHaloScaleLength,
+                  LiveHaloVirialRadius,
                   InitialTemperature,
                   InitialDensity,
                   InitialMagnField,
                   UseParticles,
                   UseGas,
                   UseMetals,
+                  UseCGM,
                   level, // used to be level+1
                   SetBaryonFields,
                   0) == FAIL)
@@ -408,6 +457,8 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
               UseGas);
       fprintf(Outfptr, "UseMetals          = %"ISYM"\n",
               UseMetals);
+      fprintf(Outfptr, "UseCGM             = %"ISYM"\n",
+              UseCGM);
       fprintf(Outfptr, "InitialTemperature = %"FSYM"\n",
               InitialTemperature);
       fprintf(Outfptr, "InitialDensity     = %"FSYM"\n",
@@ -425,6 +476,18 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
                 DiskMetallicity[sphere]);
         fprintf(Outfptr, "DiskMetallicityScale[%"ISYM"] = %"FSYM"\n", sphere,
                 DiskMetallicityScale[sphere]);
+        fprintf(Outfptr, "CGMCentralDensity[%"ISYM"] = %"FSYM"\n", sphere,
+                CGMCentralDensity[sphere]);
+        fprintf(Outfptr, "CGMCoreRadius[%"ISYM"] = %"FSYM"\n", sphere,
+                CGMCoreRadius[sphere]);
+        fprintf(Outfptr, "CGMMetallicity[%"ISYM"] = %"FSYM"\n", sphere,
+                CGMMetallicity[sphere]);
+        fprintf(Outfptr, "LiveHaloMass[%"ISYM"] = %"FSYM"\n", sphere,
+                LiveHaloMass[sphere]);
+        fprintf(Outfptr, "LiveHaloScaleLength[%"ISYM"] = %"FSYM"\n", sphere,
+                LiveHaloScaleLength[sphere]);
+       fprintf(Outfptr, "LiveHaloVirialRadius[%"ISYM"] = %"FSYM"\n", sphere,
+                LiveHaloVirialRadius[sphere]);
         fprintf(Outfptr, "DiskPosition[%"ISYM"] = ", sphere);
         WriteListOfFloats(Outfptr, MetaData.TopGridRank,
                           DiskPosition[sphere]);

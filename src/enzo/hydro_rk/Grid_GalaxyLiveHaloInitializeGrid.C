@@ -49,6 +49,31 @@ static float CosmologySimulationInitialFractionHM    = 2.0e-9;
 static float CosmologySimulationInitialFractionH2I   = 2.0e-20;
 static float CosmologySimulationInitialFractionH2II  = 3.0e-14;
 
+// auxiliary function for computing the temperature profile of CGM
+
+/*
+double F0(double r, double r_c, double a) {
+  double asqrp = a*a + r_c*r_c;
+  double asqrm = a*a - r_c*r_c;
+  return (pi * asqrm / 2 + r_c * asqrp / (a + r) - asqrm * atan(r/r_c)
+          - r_c * a * log((a + r)*(a + r) / (r*r + r_c*r_c))) 
+         / (r_c * asqrp);
+}
+
+double F1(double r, double r_c) {
+  double atanr = atan(r/r_c);
+  return pi*pi / (8*r_c) - atanr*atanr / (2*r_c) - atanr / r;
+}
+*/
+
+double compute_tempr_cgm(double x, double a, double b, double c) {
+  return (b * (1 + a*a - (a*a - 1) * (a + x) * atan(x) 
+               + a*(a + x) * (log(x*x + 1) - 2 * log(a + x))) 
+              / (pow((a*a + 1), 2) * (a + x)) 
+          + c) * (x*x + 1);
+}
+
+
 int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                                        char* HaloDataFile[MAX_SPHERES],
                                        EquilibriumGalaxyDisk DiskTable[MAX_SPHERES],
@@ -60,12 +85,19 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                                        float SphereBeta[MAX_SPHERES],
                                        float SphereMetallicity[MAX_SPHERES],
                                        float SphereMetallicityScale[MAX_SPHERES],
+                                       float CGMCentralDensity[MAX_SPHERES],
+                                       float CGMCoreRadius[MAX_SPHERES],
+                                       float CGMMetallicity[MAX_SPHERES],
+                                       float LiveHaloMass[MAX_SPHERES],
+                                       float LiveHaloScaleLength[MAX_SPHERES],
+                                       float LiveHaloVirialRadius[MAX_SPHERES],
                                        float InitialTemperature,
                                        float InitialDensity,
                                        float InitialMagnField,
                                        int UseParticles,
                                        int UseGas,
                                        int UseMetals,
+                                       int UseCGM,
                                        int level,
                                        int SetBaryonFields,
                                        int partitioned)
@@ -158,6 +190,8 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
     GetUnits(&DensityUnits, &LengthUnits, &TemperatureUnits,
          &TimeUnits, &VelocityUnits, Time);
+
+    float HaloMassParticles[MAX_SPHERES];
 
     /* =====================================================================
      * S. Selg (10/2019): N-BODY REALIZATION OF A DARK MATTER HALO.
@@ -312,6 +346,10 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
         if (debug)
           printf("GalaxyLiveHalo, processor: %"ISYM": number of particles on current grid: %"ISYM"\n", MyProcessorNumber, NumberOfParticles);
 
+        // TODO: communicate between processors for parallel root grid I/O and count for individual spheres
+        HaloMassParticles[sphere] = ParticleMass[0] * part_id;
+        printf("GalaxyLiveHalo: DM halo mass: %"GSYM" solar masses\n", HaloMassParticles[sphere] * DensityUnits * pow(LengthUnits, 3.0) / SolarMass);
+
     } // END IF UseParticles
 
     if (UseGas)
@@ -320,15 +358,20 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
        * TRANSFORM DISK COORDINATES AND INTERPOLATE TO GRID
        */
 
-      float r_max[MAX_SPHERES], r_metal[MAX_SPHERES], density_min[MAX_SPHERES];
+      float r_max[MAX_SPHERES], r_metal[MAX_SPHERES], r_core[MAX_SPHERES];
+      float cgm_profile_b[MAX_SPHERES], cgm_profile_c[MAX_SPHERES];
+      float density_min[MAX_SPHERES], density_cgm_cutoff[MAX_SPHERES], tempr_cgm_cutoff[MAX_SPHERES];
+      float HaloMassGas[MAX_SPHERES];
       float SoundSpeedIsoth[MAX_SPHERES];
       float SphereRotNorm[MAX_SPHERES];
       float SphereTransformMatrix[MAX_SPHERES][MAX_DIMENSION][MAX_DIMENSION];
 
-      /* transformation from disk to grid coordinates */
+      /* Transform disk to grid coordinates and compute basic parameters. */
 
       for (sphere = 0; sphere < NumberOfSpheres; sphere++)
       {
+        int iter = 0;
+        double a, x_max, x_vir, tempr_vir;
         double norm;
         double z_sl[3], x_sl[3];
 
@@ -368,26 +411,84 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                     << SphereTransformMatrix[sphere][1][0] << ", " << SphereTransformMatrix[sphere][1][1] << ", " << SphereTransformMatrix[sphere][1][2] << "\n"
                     << SphereTransformMatrix[sphere][2][0] << ", " << SphereTransformMatrix[sphere][2][1] << ", " << SphereTransformMatrix[sphere][2][2] << std::endl;
 
+        
         // cylindrical/spherical region in which disk data are interpolated
         r_max[sphere] = SphereRadius[sphere] * kpc_cm/LengthUnits;
 
         // metallicity scale length in code units
         r_metal[sphere] = SphereMetallicityScale[sphere] * kpc_cm/LengthUnits;
 
-        // density floor to ensure that disk pressure exceeds pressure of ambient medium
-        density_min[sphere] = InitialDensity * InitialTemperature/SphereTemperature[sphere];
+        if (UseCGM) {
+          // CGM core radius in code units
+          r_core[sphere] = CGMCoreRadius[sphere] * kpc_cm/LengthUnits;
+
+          a = LiveHaloScaleLength[sphere]/CGMCoreRadius[sphere];
+          x_max = r_max[sphere]/r_core[sphere];
+          x_vir = LiveHaloVirialRadius[sphere]/CGMCoreRadius[sphere];
+
+          // check if temperature drops below zero with some margin at sphere radius 
+          if (x_max >= x_vir)
+            ENZO_FAIL("Error in GalaxyLiveHalo: unphysical CGM profile, sphere radius must be smaller than virial radius.")
+
+          // density and temperature at sphere boundary assuming pressure balance with ambient medium
+          density_cgm_cutoff[sphere] = CGMCentralDensity[sphere] / (1 + x_max*x_max);
+          
+          // coefficients b and c of CGM temperature profile
+          cgm_profile_b[sphere] = GravConst * mu * mh * LiveHaloMass[sphere] * SolarMass / (kboltz * CGMCoreRadius[sphere] * kpc_cm);          
+          cgm_profile_c[sphere] = -cgm_profile_b[sphere] * (1 + a*a - (a*a - 1) * (a + x_vir) * atan(x_vir) 
+                                                            + a*(a + x_vir) * (log(x_vir*x_vir + 1) - 2 * log(a + x_vir))) 
+                                  / (pow((a*a + 1), 2) * (a + x_vir));
+          /*             
+          cgm_profile_c[sphere] = CGMCentralTemperature[sphere] -
+                                  cgm_profile_b[sphere] * (1 + a*a * (1.0 - 2.0 * log(a))) / (pow((a*a + 1), 2) * a);
+          */
+          
+          tempr_cgm_cutoff[sphere] = 
+            compute_tempr_cgm(r_max[sphere]/r_core[sphere],
+                              LiveHaloScaleLength[sphere]/CGMCoreRadius[sphere],
+                              cgm_profile_b[sphere],
+                              cgm_profile_c[sphere]);
+
+          // check if temperature drops below zero with some margin at sphere radius 
+          if (tempr_cgm_cutoff[sphere] < ShockTemperatureFloor)
+            ENZO_FAIL("Error in GalaxyLiveHalo: unphysical CGM profile, temperature must be positive inside sphere.")
+
+        } else {
+          // density floor to ensure that disk pressure exceeds pressure of ambient medium
+          density_min[sphere] = InitialDensity * InitialTemperature/SphereTemperature[sphere];
+        }
 
         // isothermal speed of sound (pressure/density)
         SoundSpeedIsoth[sphere] = sqrt(kboltz * SphereTemperature[sphere] / (mu * mh)) / VelocityUnits;
 
         if (MyProcessorNumber == ROOT_PROCESSOR) {
+          printf("GalaxyLiveHalo: disk isothermal speed of sound: %"GSYM" cm/s\n", SoundSpeedIsoth[sphere] * VelocityUnits);
+          if (UseMetals)
+            printf("GalaxyLiveHalo: disk metallicity scale length: %"GSYM" kpc, %"GSYM"\n", SphereMetallicityScale[sphere], r_metal[sphere]);
           printf("GalaxyLiveHalo: sphere radius: %"GSYM" kpc, %"GSYM"\n", SphereRadius[sphere], r_max[sphere]);
-          printf("GalaxyLiveHalo: sphere density floor: %"GSYM" g/cm^3q, %"GSYM"\n", density_min[sphere] * DensityUnits, density_min[sphere]);
-          printf("GalaxyLiveHalo: metallicity scale length: %"GSYM" kpc, %"GSYM"\n", SphereMetallicityScale[sphere], r_metal[sphere]);
-          printf("GalaxyLiveHalo: background density: %"GSYM" g/cm^3\n", InitialDensity * DensityUnits);
+          if (UseCGM) {
+            printf("GalaxyLiveHalo: CGM core radius: %"GSYM" kpc, %"GSYM"\n", CGMCoreRadius[sphere], r_core[sphere]);
+            printf("GalaxyLiveHalo: CGM total mass: %"GSYM" solar masses\n", 
+              4.0 * pi * pow(r_core[sphere] * LengthUnits, 3) * CGMCentralDensity[sphere] * DensityUnits 
+              * (r_max[sphere]/r_core[sphere] - atan(r_max[sphere]/r_core[sphere])) / SolarMass);
+            printf("GalaxyLiveHalo: CGM profile coefficients: %"GSYM", %"GSYM"\n", cgm_profile_b[sphere], cgm_profile_c[sphere]);
+            printf("GalaxyLiveHalo: CGM central density: %"GSYM" g/cm^3\n", CGMCentralDensity[sphere] * DensityUnits);
+            printf("GalaxyLiveHalo: CGM central temperature: %"GSYM" K\n", 
+              compute_tempr_cgm(0,
+                                LiveHaloScaleLength[sphere]/CGMCoreRadius[sphere],
+                                cgm_profile_b[sphere],
+                                cgm_profile_c[sphere]));
+            printf("GalaxyLiveHalo: CGM virial temperature: %"GSYM" K \n", 2.0 * cgm_profile_b[sphere] / (5.0 * x_vir));
+            printf("GalaxyLiveHalo: CGM density at cutoff: %"GSYM" g/cm^3, %"GSYM"\n", 
+              density_cgm_cutoff[sphere] * DensityUnits, density_cgm_cutoff[sphere]);
+            printf("GalaxyLiveHalo: CGM temperature at cutoff: %"GSYM" K\n", tempr_cgm_cutoff[sphere]);
+          } else {
+            printf("GalaxyLiveHalo: sphere density floor: %"GSYM" g/cm^3, %"GSYM"\n", density_min[sphere] * DensityUnits, density_min[sphere]);
+          }
+          printf("GalaxyLiveHalo: background density: %"GSYM" g/cm^3 %"GSYM"\n", InitialDensity * DensityUnits, InitialDensity);
+          printf("GalaxyLiveHalo: background temperature: %"GSYM" K\n", InitialTemperature);
           printf("GalaxyLiveHalo: background magnetic field: %"GSYM" G\n",
                  sqrt(4 * pi * DensityUnits) * VelocityUnits * InitialMagnField);
-          printf("GalaxyLiveHalo: isothermal speed of sound: %"GSYM" cm/s\n", SoundSpeedIsoth[sphere] * VelocityUnits);
         }
       } // END FOR sphere
 
@@ -406,6 +507,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
       double xpos, ypos, zpos;
       double r, rcyl, xcyl, ycyl, zcyl;
       double density, temperature, metallicity;
+      double density_cgm, temperature_cgm;
       double norm, damping, vphi, Bphi;
       double Toroidal[MAX_DIMENSION], Velocity[MAX_DIMENSION], MagnField[MAX_DIMENSION];
 
@@ -419,6 +521,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
 
             isInSphere = false;
 
+            //vphi = 0.0;
             density = InitialDensity;
             temperature = InitialTemperature;
             metallicity = MetallicityFloor;
@@ -473,23 +576,86 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                 density = DiskTable[sphere].InterpolateEquilibriumDensityTable(rcyl*LengthUnits, zcyl*LengthUnits) / DensityUnits;
                 vphi    = DiskTable[sphere].InterpolateEquilibriumVcircTable(rcyl*LengthUnits, zcyl*LengthUnits) / VelocityUnits;
                 Bphi    = 0.0;
+                damping = 1.0;
                 
-                if (density >= density_min[sphere])
-                {
-                  /* Set disk temperature, metallicity, and magnetic field. */
+                if (UseCGM) 
+                {                  
+                  /* CGM model */
 
-                  temperature = SphereTemperature[sphere];
-                  metallicity = max(SphereMetallicity[sphere] * exp(-rcyl/r_metal[sphere]), MetallicityFloor);
-                  Bphi = sqrt(2 * density / SphereBeta[sphere]) * SoundSpeedIsoth[sphere];
-                  damping = 1.0;
+                  density_cgm = CGMCentralDensity[sphere] / (1 + pow(r/r_core[sphere], 2));
+                  temperature_cgm = 
+                    compute_tempr_cgm(r/r_core[sphere],
+                                      LiveHaloScaleLength[sphere]/CGMCoreRadius[sphere],
+                                      cgm_profile_b[sphere],
+                                      cgm_profile_c[sphere]);
+                /*
+                  (1 + pow(r/r_core[sphere], 2))
+                    * (HaloMassDM * SolarMass * F0(r, r_core[sphere], LiveHaloScaleLength[sphere] * kpc_cm/LengthUnits)
+                       + 4 * pi * pow(CGMCoreRadius[sphere] * kpc_cm, 3) * CGMCentralDensity[sphere] * DensityUnits * F1(r, r_core[sphere]))
+                    / LengthUnits;
+                */
+
+                  /* Gas pressure inside disk exceeds pressure of ambient medium and CGM. */               
+
+                  if ((density > density_min[sphere]) && 
+                      (density * SphereTemperature[sphere] > density_cgm * temperature_cgm))
+                  {
+                      /* Set disk temperature, metallicity, and magnetic field. */
+
+                      temperature = SphereTemperature[sphere];
+                      metallicity = max(SphereMetallicity[sphere] * exp(-rcyl/r_metal[sphere]), CGMMetallicity[sphere]);
+                      Bphi = sqrt(2 * density / SphereBeta[sphere]) * SoundSpeedIsoth[sphere];
+                  }
+                  else
+                  {
+                    /* Set CGM density and temperature and exponential damping of rotation velocity if                      
+                       pressure exceeds pressure of ambient medium. */                    
+
+                    if (density_cgm * temperature_cgm > InitialDensity * InitialTemperature)
+                    //if (density_cgm > InitialDensity)
+                    {
+                      density = density_cgm;
+                      temperature = temperature_cgm;
+                      metallicity = CGMMetallicity[sphere];
+                    }
+                    else
+                    {
+                      density = InitialDensity;
+                    }
+
+                    /* CGM and ambient medium are non-rotating. */
+
+                    vphi = 0.0;
+                  }
                 }
                 else
-                {                
-                  /* Set density floor and exponential damping of rotation velocity. */
+                {
+                  /* Disk interior if gas pressure exceeds ambient pressure. */
+                 
+                  if (density > density_min[sphere])
+                  {
+                    /* Set disk temperature, metallicity, and magnetic field. */
 
-                  damping = exp(1 - density_min[sphere]/density);
-                  density = InitialDensity;
+                    temperature = SphereTemperature[sphere];
+                    metallicity = max(SphereMetallicity[sphere] * exp(-rcyl/r_metal[sphere]), MetallicityFloor);
+                    Bphi = sqrt(2 * density / SphereBeta[sphere]) * SoundSpeedIsoth[sphere];
+                  }
+                  else
+                  {
+                    /* Set density floor and exponential damping of rotation velocity. */
+ 
+                    damping = exp(1 - density_min[sphere]/density);
+                    density = InitialDensity;
+                  }
                 }
+
+                /* Consistency check while developing. */
+
+                //if (density * temperature < InitialDensity * InitialTemperature)
+                //  ENZO_FAIL("Error in GalaxyLiveHalo: pressure below floor, debug code.")
+
+                //if ((density * temperature <= InitialDensity * InitialTemperature) && (vphi*damping > 0.0))
+                //  printf("r = %"GSYM", rcyl = %"GSYM", z = %"GSYM", vphi = %"GSYM", %"GSYM"\n", r, rcyl, z, vphi*damping, density * temperature);
 
                 /* Define azimuthal unit vector if not at disk center. */
 
