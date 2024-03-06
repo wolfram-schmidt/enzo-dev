@@ -49,6 +49,8 @@ static float CosmologySimulationInitialFractionHM    = 2.0e-9;
 static float CosmologySimulationInitialFractionH2I   = 2.0e-20;
 static float CosmologySimulationInitialFractionH2II  = 3.0e-14;
 
+static float CGMBeta = 1e4;
+
 // auxiliary function for computing the temperature profile of CGM
 
 /*
@@ -67,10 +69,10 @@ double F1(double r, double r_c) {
 */
 
 double compute_tempr_cgm(double x, double a, double b, double c) {
-  return (b * (1 + a*a - (a*a - 1) * (a + x) * atan(x) 
-               + a*(a + x) * (log(x*x + 1) - 2 * log(a + x))) 
-              / (pow((a*a + 1), 2) * (a + x)) 
-          + c) * (x*x + 1);
+  return (b * (1.0 + a*a - (a*a - 1) * (a + x) * atan(x) 
+               + a*(a + x) * (log(x*x + 1.0) - 2.0 * log(a + x))) 
+              / (pow((a*a + 1.0), 2) * (a + x)) 
+          + c) * (x*x + 1.0);
 }
 
 
@@ -611,12 +613,13 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                     /* Set CGM density and temperature and exponential damping of rotation velocity if                      
                        pressure exceeds pressure of ambient medium. */                    
 
-                    if (density_cgm * temperature_cgm > InitialDensity * InitialTemperature)
+                    if (density_cgm * temperature_cgm > InitialDensity * InitialTemperature * (1.0 + 1.0 / SphereBeta[sphere]))
                     //if (density_cgm > InitialDensity)
                     {
                       density = density_cgm;
                       temperature = temperature_cgm;
                       metallicity = CGMMetallicity[sphere];
+                      Bphi = sqrt(2 * density * kboltz * temperature_cgm / (CGMBeta * mu * mh)) / VelocityUnits;
                     }
                     else
                     {

@@ -404,7 +404,7 @@ int grid::ComputeNonLinearSGSEnergy(float* SGSEnergy)
 
 	// the combined prefactor
 	float CDeltaSqr = 0.5/12. * SGScoeffNLu * POW(CoCellWidth[0]*CoCellWidth[1]*CoCellWidth[2],2./3.);
-
+	
 	if (this->ComputeJacobianVelocityNormSqr(SGSEnergy) == FAIL)
 	{
 	    fprintf(stderr, "Error in grid->ComputeJacobianVelocityNormSqr.\n");

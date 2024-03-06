@@ -484,6 +484,34 @@ int grid::Group_WriteGrid(FILE *fptr, char *base_name, int grid_id, HDF5_hid_t f
         delete [] DivB;
       }
     }
+
+    if (HydroMethod == MHD_RK && SGSEnergies) {
+
+      int Vel1Num, Vel2Num, Vel3Num, B1Num, B2Num, B3Num;
+      this->IdentifyPhysicalQuantities(Vel1Num, Vel2Num, Vel3Num, B1Num, B2Num, B3Num);
+      
+      if (this->SGSUtil_ComputeJacobian(JacB,BaryonField[B1Num],BaryonField[B2Num],BaryonField[B3Num]) == FAIL) {
+        fprintf(stderr, "grid::Group_WriteGrid: Error in SGSUtil_ComputeJacobian(B).\n");
+        return FAIL;
+      }
+
+      float *buf = new float[size];
+
+      if (this->SGSUtil_ComputeJacobianNormSqr(buf, JacB) == FAIL) {
+        fprintf(stderr, "grid::Group_WriteGrid: Error in ComputeJacobianNormSqr(B).\n");
+        return FAIL;
+      }
+
+      float CDeltaSqr = 0.5/12. * SGScoeffNLb * POW(CellWidth[0][0]*CellWidth[1][0]*CellWidth[2][0],2./3.);
+
+      for ( i=0;i<size;i++ )
+        buf[i] *= CDeltaSqr;
+
+      this->write_dataset(GridRank, OutDims, "SGS_EnergyMag",
+          group_id, file_type_id, (VOIDP) buf, TRUE, temp);
+
+      delete [] buf;
+    }
     
 		/* If requested, write the External Acceleration field */
     if (WriteExternalAccel==1){

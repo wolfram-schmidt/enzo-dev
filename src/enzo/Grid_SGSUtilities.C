@@ -279,6 +279,33 @@ int grid::SGSUtil_ComputeJacobian(float *Jac[][MAX_DIMENSION],float *field1,floa
 }
 
 /*
+ * This functional calculated the Jacobian of an arbitrary 3-dimensional
+ * field (components given by field1, field2, and field3).
+ * The result is stored in the Jac array.
+ */
+int grid::SGSUtil_ComputeJacobianNormSqr(float *JacNormSqr, float *Jac[][MAX_DIMENSION]) {
+    if (ProcessorNumber != MyProcessorNumber) {
+        return SUCCESS;
+    }
+
+    if (debug1)
+      printf("[%"ISYM"] grid::SGSUtil_ComputeJacobian start\n",MyProcessorNumber);
+
+    int size = 1;
+
+    for (int dim = 0; dim < MAX_DIMENSION; dim++)
+        size *= GridDimension[dim];
+
+    for (int i=0;i<size;++i)
+        JacNormSqr[i] =
+            2.0*(Jac[SGSX][SGSX][i]*Jac[SGSX][SGSX][i] + Jac[SGSY][SGSX][i]*Jac[SGSY][SGSX][i] + Jac[SGSZ][SGSX][i]*Jac[SGSZ][SGSX][i] +
+				         Jac[SGSX][SGSY][i]*Jac[SGSX][SGSY][i] + Jac[SGSY][SGSY][i]*Jac[SGSY][SGSY][i] + Jac[SGSZ][SGSY][i]*Jac[SGSZ][SGSY][i] +
+				         Jac[SGSX][SGSZ][i]*Jac[SGSX][SGSZ][i] + Jac[SGSY][SGSZ][i]*Jac[SGSY][SGSZ][i] + Jac[SGSZ][SGSZ][i]*Jac[SGSZ][SGSZ][i]);
+
+    return SUCCESS;
+}
+
+/*
  * This functional calculated the gradient of an arbitrary scale
  * field. The result is stored in the Grad array.
  */
