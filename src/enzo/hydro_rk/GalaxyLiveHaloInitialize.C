@@ -94,6 +94,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
 
   float CGMCentralDensity[MAX_SPHERES],
         CGMCoreRadius[MAX_SPHERES],
+        CGMBeta[MAX_SPHERES],
         CGMMetallicity[MAX_SPHERES];
 
   float LiveHaloMass[MAX_SPHERES],
@@ -116,6 +117,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
     DiskMetallicityScale[sphere] = 0.0;
     CGMCentralDensity[sphere]    = 0.0;
     CGMCoreRadius[sphere]        = 0.0;
+    CGMBeta[sphere]              = huge_number; // hydrodynamical
     CGMMetallicity[sphere]       = 0.0;
     LiveHaloMass[sphere]         = 0.0;
     LiveHaloScaleLength[sphere]  = 0.0;
@@ -178,6 +180,9 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
     if (sscanf(line, "CGMCoreRadius[%"ISYM"]", &sphere) > 0)
         ret += sscanf(line, "CGMCoreRadius[%"ISYM"] = %"FSYM, &sphere,
                       &CGMCoreRadius[sphere]);
+    if (sscanf(line, "CGMBeta[%"ISYM"]", &sphere) > 0)
+        ret += sscanf(line, "CGMBeta[%"FSYM"] = %"FSYM, &sphere,
+                      &CGMBeta[sphere]);
     if (sscanf(line, "CGMMetallicity[%"ISYM"]", &sphere) > 0)
         ret += sscanf(line, "CGMMetallicity[%"ISYM"] = %"FSYM, &sphere,
                       &CGMMetallicity[sphere]);
@@ -284,6 +289,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
                     DiskMetallicityScale,
                     CGMCentralDensity,
                     CGMCoreRadius,
+                    CGMBeta,
                     CGMMetallicity,
                     LiveHaloMass,
                     LiveHaloScaleLength,
@@ -355,6 +361,7 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
                   DiskMetallicityScale,
                   CGMCentralDensity,
                   CGMCoreRadius,
+                  CGMBeta,
                   CGMMetallicity,
                   LiveHaloMass,
                   LiveHaloScaleLength,
@@ -480,6 +487,8 @@ int GalaxyLiveHaloInitialize(FILE *fptr, FILE *Outfptr,
                 CGMCentralDensity[sphere]);
         fprintf(Outfptr, "CGMCoreRadius[%"ISYM"] = %"FSYM"\n", sphere,
                 CGMCoreRadius[sphere]);
+        fprintf(Outfptr, "CGMBeta[%"ISYM"] = %"FSYM"\n", sphere,
+                CGMBeta[sphere]);
         fprintf(Outfptr, "CGMMetallicity[%"ISYM"] = %"FSYM"\n", sphere,
                 CGMMetallicity[sphere]);
         fprintf(Outfptr, "LiveHaloMass[%"ISYM"] = %"FSYM"\n", sphere,

@@ -1493,7 +1493,8 @@ int ReadParameterFile(FILE *fptr, TopGridData &MetaData, float *Initialdt)
     if (strstr(line, "UseCGM")              ) ret++;
     if (strstr(line, "InitialTemperature")  ) ret++;
     if (strstr(line, "InitialDensity")      ) ret++;
-    if (strstr(line, "InitialMagnField")    ) ret++;    
+    if (strstr(line, "InitialMagnField")    ) ret++;
+    if (strstr(line, "CGM")                 ) ret++;    
     if (strstr(line, "CloudWind")           ) ret++;
 
     if (strstr(line, "\"\"\"")              ) comment_count++;

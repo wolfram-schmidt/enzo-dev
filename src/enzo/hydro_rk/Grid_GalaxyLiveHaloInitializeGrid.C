@@ -49,8 +49,6 @@ static float CosmologySimulationInitialFractionHM    = 2.0e-9;
 static float CosmologySimulationInitialFractionH2I   = 2.0e-20;
 static float CosmologySimulationInitialFractionH2II  = 3.0e-14;
 
-static float CGMBeta = 1e4;
-
 // auxiliary function for computing the temperature profile of CGM
 
 /*
@@ -89,6 +87,7 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                                        float SphereMetallicityScale[MAX_SPHERES],
                                        float CGMCentralDensity[MAX_SPHERES],
                                        float CGMCoreRadius[MAX_SPHERES],
+                                       float CGMBeta[MAX_SPHERES],
                                        float CGMMetallicity[MAX_SPHERES],
                                        float LiveHaloMass[MAX_SPHERES],
                                        float LiveHaloScaleLength[MAX_SPHERES],
@@ -590,17 +589,12 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                                       LiveHaloScaleLength[sphere]/CGMCoreRadius[sphere],
                                       cgm_profile_b[sphere],
                                       cgm_profile_c[sphere]);
-                /*
-                  (1 + pow(r/r_core[sphere], 2))
-                    * (HaloMassDM * SolarMass * F0(r, r_core[sphere], LiveHaloScaleLength[sphere] * kpc_cm/LengthUnits)
-                       + 4 * pi * pow(CGMCoreRadius[sphere] * kpc_cm, 3) * CGMCentralDensity[sphere] * DensityUnits * F1(r, r_core[sphere]))
-                    / LengthUnits;
-                */
 
-                  /* Gas pressure inside disk exceeds pressure of ambient medium and CGM. */               
+                  /* Total pressure inside disk exceeds pressure of ambient medium and gas pressure. */               
 
                   if ((density > density_min[sphere]) && 
-                      (density * SphereTemperature[sphere] > density_cgm * temperature_cgm))
+                      (density * SphereTemperature[sphere] * (1.0 + 1.0 / SphereBeta[sphere]) > 
+                       density_cgm * temperature_cgm) * (1.0 + 1.0 / CGMBeta[sphere]))
                   {
                       /* Set disk temperature, metallicity, and magnetic field. */
 
@@ -613,13 +607,12 @@ int grid::GalaxyLiveHaloInitializeGrid(int NumberOfSpheres,
                     /* Set CGM density and temperature and exponential damping of rotation velocity if                      
                        pressure exceeds pressure of ambient medium. */                    
 
-                    if (density_cgm * temperature_cgm > InitialDensity * InitialTemperature * (1.0 + 1.0 / SphereBeta[sphere]))
-                    //if (density_cgm > InitialDensity)
+                    if (density_cgm * temperature_cgm > InitialDensity * InitialTemperature )
                     {
                       density = density_cgm;
                       temperature = temperature_cgm;
                       metallicity = CGMMetallicity[sphere];
-                      Bphi = sqrt(2 * density * kboltz * temperature_cgm / (CGMBeta * mu * mh)) / VelocityUnits;
+                      Bphi = sqrt(2 * density * kboltz * temperature_cgm / (CGMBeta[sphere] * mu * mh)) / VelocityUnits;
                     }
                     else
                     {

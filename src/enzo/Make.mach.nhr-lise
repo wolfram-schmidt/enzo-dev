@@ -1,8 +1,8 @@
 #=======================================================================
 #
-# FILE:        Make.mach.hlrn-lise
+# FILE:        Make.mach.nhr-lise
 #
-# DESCRIPTION: Makefile settings for the HLRN IV site in Berlin (Lise)
+# DESCRIPTION: Makefile settings for NHR@ZIB (Lise)
 #
 # AUTHOR:      Rick Wagner (rick@ucsd.edu)
 # AUTHOR, mod: Simon Selg
@@ -27,7 +27,7 @@
 #
 #=======================================================================
 
-MACH_TEXT  = HLRN IV, Berlin (Lise) machine file. Requires Intel gfortran/gcc/g++, IntelMPI, and a \
+MACH_TEXT  = NHR Lise machine file. Requires Intel gfortran/gcc/g++, IntelMPI, and a \
 serial HDF5 library. Make sure to set the correct LOCAL_HDF5_INSTALL path in the \
 machine file (e.g., /usr for a system-wide installation or a custom path for local \
 installations).

@@ -383,7 +383,7 @@ int grid::Group_WriteGrid(FILE *fptr, char *base_name, int grid_id, HDF5_hid_t f
       }
     }
 
-    if (VelAnyl==2 || SGSEnergies) {
+    if (VelAnyl==2) {
 
 	    if (this->ComputeJacobianVelocity(0) == FAIL) {
 	      fprintf(stderr, "Error in grid->ComputeJacobianVelocity.\n");
@@ -423,7 +423,7 @@ int grid::Group_WriteGrid(FILE *fptr, char *base_name, int grid_id, HDF5_hid_t f
 
       this->write_dataset(GridRank, OutDims, "Velocity_Compression",
           group_id, file_type_id, (VOIDP) buf, TRUE, temp);
-
+      /*
 	    if (GridRank==3 && SGSEnergies) {
 	      if (this->ComputeNonLinearSGSEnergy(buf) == FAIL) {
 	        fprintf(stderr, "Error in grid->ComputeNonLinearSGSEnergy.\n");
@@ -433,6 +433,7 @@ int grid::Group_WriteGrid(FILE *fptr, char *base_name, int grid_id, HDF5_hid_t f
         this->write_dataset(GridRank, OutDims, "SGS_Energy",
 		    group_id, file_type_id, (VOIDP) buf, TRUE, temp);
 	    }
+      */
 
       delete [] buf;
     }
@@ -485,30 +486,77 @@ int grid::Group_WriteGrid(FILE *fptr, char *base_name, int grid_id, HDF5_hid_t f
       }
     }
 
-    if (HydroMethod == MHD_RK && SGSEnergies) {
+    if (SGSEnergies) {
 
-      int Vel1Num, Vel2Num, Vel3Num, B1Num, B2Num, B3Num;
-      this->IdentifyPhysicalQuantities(Vel1Num, Vel2Num, Vel3Num, B1Num, B2Num, B3Num);
-      
-      if (this->SGSUtil_ComputeJacobian(JacB,BaryonField[B1Num],BaryonField[B2Num],BaryonField[B3Num]) == FAIL) {
-        fprintf(stderr, "grid::Group_WriteGrid: Error in SGSUtil_ComputeJacobian(B).\n");
+      int DensNum, GENum, TENum, Vel1Num, Vel2Num, Vel3Num, B1Num, B2Num, B3Num;
+      this->IdentifyPhysicalQuantities(DensNum, GENum, Vel1Num, Vel2Num, Vel3Num,
+        TENum, B1Num, B2Num, B3Num);
+
+      if (this->SGSUtil_ComputeJacobian(JacVel,BaryonField[Vel1Num],BaryonField[Vel2Num],BaryonField[Vel3Num]) == FAIL) {
+        fprintf(stderr, "grid::SourceTerms: Error in SGSUtil_ComputeJacobian(Vel).\n");
         return FAIL;
       }
 
       float *buf = new float[size];
 
-      if (this->SGSUtil_ComputeJacobianNormSqr(buf, JacB) == FAIL) {
-        fprintf(stderr, "grid::Group_WriteGrid: Error in ComputeJacobianNormSqr(B).\n");
+      if (this->SGSUtil_ComputeJacobianNormSqr(buf, JacVel) == FAIL) {
+        fprintf(stderr, "grid::Group_WriteGrid: Error in ComputeJacobianNorm(Vel).\n");
         return FAIL;
       }
 
-      float CDeltaSqr = 0.5/12. * SGScoeffNLb * POW(CellWidth[0][0]*CellWidth[1][0]*CellWidth[2][0],2./3.);
+      // the combined prefactor
+      float CDeltaSqr = 0.25/12. * SGScoeffNLu * POW(CellWidth[0][0]*CellWidth[1][0]*CellWidth[2][0],2./3.);
 
       for ( i=0;i<size;i++ )
-        buf[i] *= CDeltaSqr;
+        buf[i] *= CDeltaSqr * BaryonField[DensNum][i];
 
-      this->write_dataset(GridRank, OutDims, "SGS_EnergyMag",
+      this->write_dataset(GridRank, OutDims, "SGS_Energy_Kin",
           group_id, file_type_id, (VOIDP) buf, TRUE, temp);
+
+      if (HydroMethod == MHD_RK) {
+        if (this->SGSUtil_ComputeJacobian(JacB,BaryonField[B1Num],BaryonField[B2Num],BaryonField[B3Num]) == FAIL) {
+          fprintf(stderr, "grid::Group_WriteGrid: Error in SGSUtil_ComputeJacobian(B).\n");
+          return FAIL;
+        }
+
+        if (this->SGSUtil_ComputeJacobianNormSqr(buf, JacB) == FAIL) {
+          fprintf(stderr, "grid::Group_WriteGrid: Error in ComputeJacobianNormSqr(B).\n");
+          return FAIL;
+        }
+
+        float CDeltaSqr = 0.25/12. * SGScoeffNLb * POW(CellWidth[0][0]*CellWidth[1][0]*CellWidth[2][0],2./3.);
+
+        for ( i=0;i<size;i++ )
+          buf[i] *= CDeltaSqr;
+
+        this->write_dataset(GridRank, OutDims, "SGS_Energy_Mag",
+            group_id, file_type_id, (VOIDP) buf, TRUE, temp);
+
+        float *EMF[MAX_DIMENSION];
+
+        for (int dim = 0; dim < MAX_DIMENSION; dim++) {
+          EMF[dim] = new float[size];
+          for (int i = 0; i < size; i++)
+            EMF[dim][i] = 0.;
+        }
+
+        if (SGScoeffERS2M2Star != 0.) 
+          SGS_AddEMF_eddy_resistivity(EMF);
+
+        if (SGScoeffNLemfCompr != 0.) 
+          SGS_AddEMF_nonlinear_compressive(EMF);
+
+        this->write_dataset(GridRank, OutDims, "SGS_EMF1",
+            group_id, file_type_id, (VOIDP) EMF[0], TRUE, temp);
+        this->write_dataset(GridRank, OutDims, "SGS_EMF2",
+            group_id, file_type_id, (VOIDP) EMF[1], TRUE, temp);
+        this->write_dataset(GridRank, OutDims, "SGS_EMF3",
+            group_id, file_type_id, (VOIDP) EMF[2], TRUE, temp);
+
+        for (int dim = 0; dim < MAX_DIMENSION; dim++) {
+          delete [] EMF[dim];
+        }
+      }
 
       delete [] buf;
     }
