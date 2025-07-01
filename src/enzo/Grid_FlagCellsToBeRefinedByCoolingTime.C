@@ -23,6 +23,9 @@
 #include "GridList.h"
 #include "ExternalBoundary.h"
 #include "Grid.h"
+
+// HACK: constrain refinement by cooling time to densities above threshold
+//static float dens_thresh = 0.1; // density threshold in code units
  
 /* function prototypes */
  
@@ -39,7 +42,10 @@ int grid::FlagCellsToBeRefinedByCoolingTime()
  
   if (MyProcessorNumber != ProcessorNumber)
     return SUCCESS;
- 
+
+  //if (MyProcessorNumber == ROOT_PROCESSOR)
+  //  printf("FlagCellsToBeRefinedByCoolingTime: %"GSYM"\n", CoolingRefinementDensityThresh);
+
   /* error check */
  
   if (FlaggingField == NULL) {
@@ -111,10 +117,11 @@ int grid::FlagCellsToBeRefinedByCoolingTime()
     for (i = 0; i < size; i++) {
       gas_energy = BaryonField[TENum][i];
       for (dim = 0; dim < GridRank; dim++)
-	gas_energy -= 0.5*BaryonField[Vel1Num+dim][i]*
+	      gas_energy -= 0.5*BaryonField[Vel1Num+dim][i]*
 	                  BaryonField[Vel1Num+dim][i];
-      if (cooling_time[i]*cooling_time[i]*gas_energy*Coef < 1.0)
-	FlaggingField[i]++;
+      if (cooling_time[i]*cooling_time[i]*gas_energy*Coef < 1.0 && 
+          BaryonField[DensNum][i] >= CoolingRefinementDensityThresh)
+	      FlaggingField[i]++;
     }
   }
  

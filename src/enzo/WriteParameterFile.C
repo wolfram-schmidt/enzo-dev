@@ -656,6 +656,8 @@ int WriteParameterFile(FILE *fptr, TopGridData &MetaData, char *name = NULL)
 	  RefineByJeansLengthSafetyFactor);
   fprintf(fptr, "JeansRefinementColdTemperature  = %"FSYM"\n",
 	  JeansRefinementColdTemperature);
+  fprintf(fptr, "CoolingRefinementDensityThresh  = %"FSYM"\n",
+	  CoolingRefinementDensityThresh);
   fprintf(fptr, "RefineByResistiveLengthSafetyFactor  = %"FSYM"\n", 
 	  RefineByResistiveLengthSafetyFactor);
   fprintf(fptr, "MustRefineParticlesRefineToLevel = %"ISYM"\n",

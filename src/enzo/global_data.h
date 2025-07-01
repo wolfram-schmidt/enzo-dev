@@ -666,6 +666,11 @@ EXTERN float MinimumEnergyRatioForRefinement;
 
 EXTERN float RefineByJeansLengthSafetyFactor;
 
+/* For CellFlaggingMethod = 7,
+   The density threshold (code units) for refinement by cooling time. */
+
+EXTERN float CoolingRefinementDensityThresh;
+
 /* If > 0, this will be used instead of the temperature at all locations */
 
 EXTERN float JeansRefinementColdTemperature;

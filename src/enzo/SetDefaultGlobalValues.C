@@ -571,11 +571,12 @@ int SetDefaultGlobalValues(TopGridData &MetaData)
  
   //MinimumSlopeForRefinement        = 0.3;          // 30% change in value
   MinimumShearForRefinement        = 1.0;          //AK
-  OldShearMethod                   = 0;            
+  OldShearMethod                   = 0;
   MinimumPressureJumpForRefinement = 0.33;         // As in PPM method paper
   MinimumEnergyRatioForRefinement  = 0.1;          // conservative!
   RefineByJeansLengthSafetyFactor  = 4.0;
   JeansRefinementColdTemperature  = -1.0;
+  CoolingRefinementDensityThresh   = 0.0;            
   RefineByResistiveLengthSafetyFactor  = 2.0;
   ShockwaveRefinementMinMach = 1.3; // Only above M=1.3
   ShockwaveRefinementMinVelocity = 1.0e7; //1000 km/s

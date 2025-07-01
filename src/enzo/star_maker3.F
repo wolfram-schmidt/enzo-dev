@@ -6,7 +6,7 @@ c=======================================================================
 c////////////////////////  SUBROUTINE STAR_MAKER \\\\\\\\\\\\\\\\\\\\\\\
 c
       subroutine star_maker3(nx, ny, nz,
-     &                      d, dm, temp, u, v, w, cooltime,
+     &                      d, dm, temp, u, v, w, cooltime, sigmasqr,
      &                      dt, r, metal, zfield1, zfield2,
      &                      dx, t, z, procnum, 
      &                      d1, x1, v1, t1,
@@ -44,6 +44,7 @@ c    dm    - dark matter field
 c    temp  - temperature field
 c    u,v,w - velocity fields
 c    cooltime - cooling time in code units
+c    sigmasqr - squared turbulent velocity in code units
 c    r     - refinement field (non-zero if zone is further refined)
 c    dt    - current timestep
 c    dx    - zone size (code units)
@@ -87,7 +88,7 @@ c
       INTG_PREC procnum, imetalSNIa
       R_PREC    d(nx,ny,nz), dm(nx,ny,nz), temp(nx,ny,nz)
       R_PREC    u(nx,ny,nz), v(nx,ny,nz), w(nx,ny,nz)
-      R_PREC    r(nx,ny,nz), cooltime(nx,ny,nz)
+      R_PREC    r(nx,ny,nz), cooltime(nx,ny,nz), sigmasqr(nx,ny,nz)
       R_PREC    metal(nx,ny,nz), zfield1(nx,ny,nz), zfield2(nx,ny,nz)
       R_PREC    dt, dx, z
       R_PREC    d1, x1, v1, t1
@@ -105,8 +106,8 @@ c
 c  Locals:
 c
       INTG_PREC  i, j, k, ii
-      R_PREC   div, tdyn, dtot
-      R_PREC   sndspdC
+      R_PREC   div, tdyn, tcr, dtot
+      R_PREC   sndspdC, epsff
       R_PREC   isosndsp2, starmass, starfraction, bmass, jeanmass
       parameter (sndspdC=1.3095e8_RKIND)
 c
@@ -135,6 +136,10 @@ c
 c              2) is density greater than threshold?
 c
                if (d(i,j,k) .lt. odthresh) goto 10
+c
+#define CONSTANT_EFFICIENCY
+c
+#ifdef CONSTANT_EFFICIENCY
 c
 c              3) is divergence negative?
 c                 (the first calculation is face centered for ZEUS, 
@@ -182,6 +187,24 @@ c              6) Check to see if star is above threshold (given
 c                 in units of M_solar)
 c
                starfraction = min(masseff*dt/tdyn, 0.9_RKIND)
+#else
+c 
+c              3) dynamical star formation efficiency based on model by Semenov et al. (2016)
+c 
+c              free-fall and crossing time scales
+c
+               dtot = d(i,j,k)*d1
+               bmass = dtot * dble(x1*dx)**3 / SolarMass
+               tdyn = sqrt(3._RKIND*pi_val/
+     &                    (32._RKIND*GravConst*dtot))/t1
+               isosndsp2 = sndspdC * temp(i,j,k) / (v1*v1)
+               tcr = 0.5_RKIND * dx / sqrt(sigmasqr(i,j,k) + isosndsp2)
+c
+c              efficiency given by ratio of time scales
+c
+               epsff = 0.9_RKIND * exp(-1.6_RKIND * tdyn / tcr)
+               starfraction = min(epsff*dt/tdyn, 0.9_RKIND)
+#endif
                tdyn = max(tdyn, mintdyn*3.15e7_RKIND/t1)
 
 c
@@ -209,7 +232,12 @@ c              if it's less than threshold, go to the next cell.
 c
                if (starfraction*bmass .lt. smthresh) goto 10
 #endif
-
+c
+c               write(6,1001) sqrt(isosndsp2)*v1, sqrt(sigmasqr(i,j,k))*v1,
+c     &                       tdyn*t1/3.15e13_RKIND, tcr*t1/3.15e13_RKIND,
+c     &                       epsff, starfraction, bmass
+c
+ 1001          format(7(1pe10.3,1x))
 c
 c              Create a star particle
 c

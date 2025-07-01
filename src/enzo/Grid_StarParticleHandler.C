@@ -132,7 +132,7 @@ extern "C" void FORTRAN_NAME(star_maker3mom)(int *nx, int *ny, int *nz,
 
 extern "C" void FORTRAN_NAME(star_maker3)(int *nx, int *ny, int *nz,
              float *d, float *dm, float *temp, float *u, float *v, float *w,
-                float *cooltime,
+                float *cooltime, float *sigmasqr,
              float *dt, float *r, float *metal, float *zfield1, float *zfield2,
              float *dx, FLOAT *t, float *z,
              int *procnum,
@@ -707,6 +707,72 @@ int grid::StarParticleHandler(HierarchyEntry* SubgridPointer, int level,
     kdissH2INum = FindField(kdissH2I, FieldType, NumberOfBaryonFields);
   }
 
+  float *sigmasqrfield = NULL;
+  if (STARMAKE_METHOD(UNIGRID_STAR)) {
+    sigmasqrfield = new float[size];
+
+    for (int n = 0; n < size; n++)
+      sigmasqrfield[n] = 0.0;
+
+    if (UseSGSModel) {
+      if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
+         printf("grid::StarParticleHandler:: Computing JacVel.\n");
+      
+      if (this->SGSUtil_ComputeJacobian(JacVel,BaryonField[Vel1Num],BaryonField[Vel2Num],BaryonField[Vel3Num]) == FAIL) {
+         fprintf(stderr, "grid::StarParticleHandler: Error in SGSUtil_ComputeJacobian(Vel).\n");
+         return FAIL;
+      }
+
+      if (this->SGSUtil_ComputeJacobianNormSqr(sigmasqrfield, JacVel) == FAIL) {
+         fprintf(stderr, "grid::StarParticleHandler: Error in ComputeJacobianNorm(Vel).\n");
+         return FAIL;
+      }
+  
+      // the combined prefactor (including a factor 0.5 to compensate the factor 2 in the norm)
+      float CDeltaSqr = 0.5/12. * SGScoeffNLu * POW(CellWidth[0][0]*CellWidth[1][0]*CellWidth[2][0],2./3.);
+
+      for (k = GridStartIndex[2]; k <= GridEndIndex[2]; k++)
+         for (j = GridStartIndex[1]; j <= GridEndIndex[1]; j++) {
+	         index = (k*GridDimension[1] + j)*GridDimension[0] + GridStartIndex[0];
+
+	         for (i = GridStartIndex[0]; i <= GridEndIndex[0]; i++, index++) 
+	            sigmasqrfield[index] *= CDeltaSqr;
+         
+         }
+
+      if (HydroMethod == MHD_RK) {
+
+        if (debug && (MyProcessorNumber == ROOT_PROCESSOR))
+          printf("grid::StarParticleHandler:: Computing JacB.\n");
+
+        float *buf = new float[size];
+
+        if (this->SGSUtil_ComputeJacobian(JacB,BaryonField[B1Num],BaryonField[B2Num],BaryonField[B3Num]) == FAIL) {
+          fprintf(stderr, "grid::StarParticleHandler: Error in SGSUtil_ComputeJacobian(B).\n");
+          return FAIL;
+        }
+
+        if (this->SGSUtil_ComputeJacobianNormSqr(buf, JacB) == FAIL) {
+          fprintf(stderr, "grid::StarParticleHandler: Error in ComputeJacobianNormSqr(B).\n");
+          return FAIL;
+        }
+
+        float CDeltaSqr = 0.5/12. * SGScoeffNLb * POW(CellWidth[0][0]*CellWidth[1][0]*CellWidth[2][0],2./3.);
+
+        //for (int n = 0; n < size; n++)
+        for (k = GridStartIndex[2]; k <= GridEndIndex[2]; k++)
+          for (j = GridStartIndex[1]; j <= GridEndIndex[1]; j++) {
+	         index = (k*GridDimension[1] + j)*GridDimension[0] + GridStartIndex[0];
+
+	         for (i = GridStartIndex[0]; i <= GridEndIndex[0]; i++, index++) 
+              sigmasqrfield[index] += CDeltaSqr * buf[index] / BaryonField[DensNum][index];
+          }
+
+        delete [] buf;
+      }
+    }
+  }
+
   /* If both metal fields exist, make a total metal field */
 
   float *MetalPointer;
@@ -898,7 +964,7 @@ int grid::StarParticleHandler(HierarchyEntry* SubgridPointer, int level,
       FORTRAN_NAME(star_maker3)(
        GridDimension, GridDimension+1, GridDimension+2,
        BaryonField[DensNum], dmfield, temperature, BaryonField[Vel1Num],
-          BaryonField[Vel2Num], BaryonField[Vel3Num], cooling_time,
+          BaryonField[Vel2Num], BaryonField[Vel3Num], cooling_time, sigmasqrfield,
        &dtFixed, BaryonField[NumberOfBaryonFields], BaryonField[MetalNum],
        BaryonField[MetalNum+1], BaryonField[MetalNum+2],
           &CellWidthTemp, &Time, &zred, &MyProcessorNumber,
@@ -2058,6 +2124,7 @@ int grid::StarParticleHandler(HierarchyEntry* SubgridPointer, int level,
   /* Clean up. */
  
   delete [] h2field;
+  delete [] sigmasqrfield;
   delete [] TotalMetals;
   delete [] temperature;
   delete [] dmfield;
