@@ -2610,6 +2610,7 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
     float *FltBB[6];
     float *FltUB[3];
 
+    int SGSUtil_ComputeJacobianDE();
     int SGSUtil_ComputeGradient(float *Grad[MAX_DIMENSION],float *field); 
     int SGSUtil_ComputeJacobian(float *Jac[][MAX_DIMENSION],float* field1,float* field2,float* field3);
     int SGSUtil_ComputeJacobianNormSqr(float *JacNormSqr, float *Jac[][MAX_DIMENSION]);
@@ -2618,6 +2619,7 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
     int SGSUtil_InternalEnergy();
 
     // the general functions that add the SGS terms to the dynamic eqns.
+     int SGS_AddMomentumTermsDE();
     int SGS_AddDiffusionTerms(float **dU);
     int SGS_AddEMFTerms(float **dU);
     int SGS_AddMomentumTerms(float **dU);

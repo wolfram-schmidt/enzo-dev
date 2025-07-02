@@ -201,7 +201,67 @@ int grid::SGSUtil_InternalEnergy() {
 }
 
 /*
- * This functional calculated the Jacobian of an arbitrary 3-dimensional
+ * This function calculates the gradient of an arbitrary scale
+ * field. The result is stored in the Grad array.
+ */
+int grid::SGSUtil_ComputeGradient(float *Grad[MAX_DIMENSION],float *field) {
+    if (ProcessorNumber != MyProcessorNumber) {
+        return SUCCESS;
+    }
+
+    if (debug1)
+      printf("[%"ISYM"] grid::SGSUtil_ComputeGradient start\n",MyProcessorNumber);
+
+    int size = 1;
+    int StartIndex[MAX_DIMENSION];
+    int EndIndex[MAX_DIMENSION];
+
+    for (int dim = 0; dim < MAX_DIMENSION; dim++) {
+        size *= GridDimension[dim];
+
+        /* we need the Jacobians in the first ghost zone as well
+         * as we'll take another derivative later on */
+        StartIndex[dim] = GridStartIndex[dim] - 1;
+        EndIndex[dim] = GridEndIndex[dim] + 1;
+    }
+
+    for (int n = 0; n < MAX_DIMENSION; n++)
+      if (Grad[n] == NULL) {
+	Grad[n] = new float[size];
+	for (int i = 0; i < size; i++)
+	  Grad[n][i] = 0.;
+      }
+
+    int igrid, ip1, im1, jp1, jm1, kp1, km1;
+    float facX = 1. / (2. * CellWidth[0][0]);
+    float facY = 1. / (2. * CellWidth[1][0]);
+    float facZ = 1. / (2. * CellWidth[2][0]);
+
+    for (int k = StartIndex[2]; k <= EndIndex[2]; k++)
+        for (int j = StartIndex[1]; j <= EndIndex[1]; j++)
+            for (int i = StartIndex[0]; i <= EndIndex[0]; i++) {
+
+                igrid = i + (j+k*GridDimension[1])*GridDimension[0];
+                ip1 = i+1 + (j+k*GridDimension[1])*GridDimension[0];
+                im1 = i-1 + (j+k*GridDimension[1])*GridDimension[0];
+                jp1 = i + (j+1+k*GridDimension[1])*GridDimension[0];
+                jm1 = i + (j-1+k*GridDimension[1])*GridDimension[0];
+                kp1 = i + (j+(k+1)*GridDimension[1])*GridDimension[0];
+                km1 = i + (j+(k-1)*GridDimension[1])*GridDimension[0];
+
+                // dx
+                Grad[SGSX][igrid] = (field[ip1] - field[im1]) * facX;
+                // dy
+                Grad[SGSY][igrid] = (field[jp1] - field[jm1]) * facY;
+                // dz
+                Grad[SGSZ][igrid] = (field[kp1] - field[km1]) * facZ;
+            }
+
+    return SUCCESS;
+}
+    
+/*
+ * This functions calculates the Jacobian of an arbitrary 3-dimensional
  * field (components given by field1, field2, and field3).
  * The result is stored in the Jac array.
  */
@@ -279,9 +339,8 @@ int grid::SGSUtil_ComputeJacobian(float *Jac[][MAX_DIMENSION],float *field1,floa
 }
 
 /*
- * This functional calculated the Jacobian of an arbitrary 3-dimensional
- * field (components given by field1, field2, and field3).
- * The result is stored in the Jac array.
+ * This functions calculates the squared norm of the Jacobian.
+ * The result is stored in the JacNormSqr array.
  */
 int grid::SGSUtil_ComputeJacobianNormSqr(float *JacNormSqr, float *Jac[][MAX_DIMENSION]) {
     if (ProcessorNumber != MyProcessorNumber) {
@@ -305,66 +364,6 @@ int grid::SGSUtil_ComputeJacobianNormSqr(float *JacNormSqr, float *Jac[][MAX_DIM
     return SUCCESS;
 }
 
-/*
- * This functional calculated the gradient of an arbitrary scale
- * field. The result is stored in the Grad array.
- */
-int grid::SGSUtil_ComputeGradient(float *Grad[MAX_DIMENSION],float *field) {
-    if (ProcessorNumber != MyProcessorNumber) {
-        return SUCCESS;
-    }
-
-    if (debug1)
-      printf("[%"ISYM"] grid::SGSUtil_ComputeGradient start\n",MyProcessorNumber);
-
-    int size = 1;
-    int StartIndex[MAX_DIMENSION];
-    int EndIndex[MAX_DIMENSION];
-
-    for (int dim = 0; dim < MAX_DIMENSION; dim++) {
-        size *= GridDimension[dim];
-
-        /* we need the Jacobians in the first ghost zone as well
-         * as we'll take another derivative later on */
-        StartIndex[dim] = GridStartIndex[dim] - 1;
-        EndIndex[dim] = GridEndIndex[dim] + 1;
-    }
-
-    for (int n = 0; n < MAX_DIMENSION; n++)
-      if (Grad[n] == NULL) {
-	Grad[n] = new float[size];
-	for (int i = 0; i < size; i++)
-	  Grad[n][i] = 0.;
-      }
-
-    int igrid, ip1, im1, jp1, jm1, kp1, km1;
-    float facX = 1. / (2. * CellWidth[0][0]);
-    float facY = 1. / (2. * CellWidth[1][0]);
-    float facZ = 1. / (2. * CellWidth[2][0]);
-
-    for (int k = StartIndex[2]; k <= EndIndex[2]; k++)
-        for (int j = StartIndex[1]; j <= EndIndex[1]; j++)
-            for (int i = StartIndex[0]; i <= EndIndex[0]; i++) {
-
-                igrid = i + (j+k*GridDimension[1])*GridDimension[0];
-                ip1 = i+1 + (j+k*GridDimension[1])*GridDimension[0];
-                im1 = i-1 + (j+k*GridDimension[1])*GridDimension[0];
-                jp1 = i + (j+1+k*GridDimension[1])*GridDimension[0];
-                jm1 = i + (j-1+k*GridDimension[1])*GridDimension[0];
-                kp1 = i + (j+(k+1)*GridDimension[1])*GridDimension[0];
-                km1 = i + (j+(k-1)*GridDimension[1])*GridDimension[0];
-
-                // dx
-                Grad[SGSX][igrid] = (field[ip1] - field[im1]) * facX;
-                // dy
-                Grad[SGSY][igrid] = (field[jp1] - field[jm1]) * facY;
-                // dz
-                Grad[SGSZ][igrid] = (field[kp1] - field[km1]) * facZ;
-            }
-
-    return SUCCESS;
-}
-    
 /*
  * This function conducts an explicit filter operation on mixed quantities, e.g.
  * flt(rho u_i u_j), which are required by the scale-similarity SGS model.
@@ -486,3 +485,86 @@ int grid::SGSUtil_ComputeMixedFilteredQuantities() {
 
     return SUCCESS;
 }
+
+/*
+ * This functions calculates the Jacobian of the velocity 
+ * for the direct-Euler PPM framework.
+ */
+int grid::SGSUtil_ComputeJacobianDE() {
+
+    if (ProcessorNumber != MyProcessorNumber) {
+        return SUCCESS;
+    }
+    if (debug)
+      printf("[%"ISYM"] grid::SGSUtil_ComputeJacobianDE start\n",MyProcessorNumber);
+
+    int DensNum, GENum, TENum, Vel1Num, Vel2Num, Vel3Num;
+        // B1Num, B2Num, B3Num, PhiNum;
+    this->IdentifyPhysicalQuantities(DensNum, GENum, Vel1Num, Vel2Num, Vel3Num, TENum); 
+            // B1Num, B2Num, B3Num, PhiNum);
+
+    int size = 1;
+    int StartIndex[MAX_DIMENSION];
+    int EndIndex[MAX_DIMENSION];
+
+    for (int dim = 0; dim < MAX_DIMENSION; dim++) {
+        size *= GridDimension[dim];
+
+        /* we need the Jacobians in the first ghost zone as well
+         * as we'll take another derivative later on */
+        StartIndex[dim] = GridStartIndex[dim] - 1;
+        EndIndex[dim] = GridEndIndex[dim] + 1;
+    }
+
+    for (int m = 0; m < MAX_DIMENSION; m++) 
+        for (int n = 0; n < MAX_DIMENSION; n++) {
+            if (JacVel[m][n] == NULL) {
+                JacVel[m][n] = new float[size];
+                for (int o = 0; o < size; o++)
+                    JacVel[m][n][o] = 0.;
+            }
+        }
+
+    int igrid, ip1, im1, jp1, jm1, kp1, km1;
+    float facX = 1. / (2. * CellWidth[0][0]);
+    float facY = 1. / (2. * CellWidth[1][0]);
+    float facZ = 1. / (2. * CellWidth[2][0]);
+
+    for (int k = StartIndex[2]; k <= EndIndex[2]; k++)
+        for (int j = StartIndex[1]; j <= EndIndex[1]; j++)
+            for (int i = StartIndex[0]; i <= EndIndex[0]; i++) {
+
+                igrid = i + (j+k*GridDimension[1])*GridDimension[0];
+                ip1 = i+1 + (j+k*GridDimension[1])*GridDimension[0];
+                im1 = i-1 + (j+k*GridDimension[1])*GridDimension[0];
+                jp1 = i + (j+1+k*GridDimension[1])*GridDimension[0];
+                jm1 = i + (j-1+k*GridDimension[1])*GridDimension[0];
+                kp1 = i + (j+(k+1)*GridDimension[1])*GridDimension[0];
+                km1 = i + (j+(k-1)*GridDimension[1])*GridDimension[0];
+
+                // xdx
+                JacVel[SGSX][SGSX][igrid] = (BaryonField[Vel1Num][ip1] - BaryonField[Vel1Num][im1]) * facX;
+                // xdy
+                JacVel[SGSX][SGSY][igrid] = (BaryonField[Vel1Num][jp1] - BaryonField[Vel1Num][jm1]) * facY;
+                // xdz
+                JacVel[SGSX][SGSZ][igrid] = (BaryonField[Vel1Num][kp1] - BaryonField[Vel1Num][km1]) * facZ;
+
+                // ydx
+                JacVel[SGSY][SGSX][igrid] = (BaryonField[Vel2Num][ip1] - BaryonField[Vel2Num][im1]) * facX;
+                // ydy
+                JacVel[SGSY][SGSY][igrid] = (BaryonField[Vel2Num][jp1] - BaryonField[Vel2Num][jm1]) * facY;
+                // ydz
+                JacVel[SGSY][SGSZ][igrid] = (BaryonField[Vel2Num][kp1] - BaryonField[Vel2Num][km1]) * facZ;
+
+                // zdx
+                JacVel[SGSZ][SGSX][igrid] = (BaryonField[Vel3Num][ip1] - BaryonField[Vel3Num][im1]) * facX;
+                // zdy
+                JacVel[SGSZ][SGSY][igrid] = (BaryonField[Vel3Num][jp1] - BaryonField[Vel3Num][jm1]) * facY;
+                // zdz
+                JacVel[SGSZ][SGSZ][igrid] = (BaryonField[Vel3Num][kp1] - BaryonField[Vel3Num][km1]) * facZ;
+
+            }
+
+    return SUCCESS;
+}
+

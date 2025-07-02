@@ -562,3 +562,125 @@ int grid::SGS_AddMomentumTerms(float **dU) {
 
   return SUCCESS;
 }
+
+/*
+ * This function initializes a zero stress tensor and calls the individual
+ * functions that add the different terms to it.
+ * Finally, the divergence of the tensor is added directly to the
+ * bayron fields (direct-Euler PPM) 
+ */
+int grid::SGS_AddMomentumTermsDE() {
+  if (ProcessorNumber != MyProcessorNumber) {
+    return SUCCESS;
+  }
+
+  if (Time == 0.)
+    return SUCCESS;
+
+  if (debug)
+    printf("[%"ISYM"] grid::SGS_AddMomentumTerms start\n",MyProcessorNumber);
+
+  int DensNum, GENum, TENum, Vel1Num, Vel2Num, Vel3Num;
+  int B1Num, B2Num, B3Num, PhiNum;
+  this->IdentifyPhysicalQuantities(DensNum, GENum, Vel1Num, Vel2Num, Vel3Num,
+      TENum, B1Num, B2Num, B3Num, PhiNum);
+
+  float* rho;
+  
+  rho = BaryonField[DensNum];
+
+  int size = 1;
+  float *Tau[6];
+
+  for (int dim = 0; dim < MAX_DIMENSION; dim++) {
+    size *= GridDimension[dim];
+  }
+
+  for (int dim = 0; dim < 6; dim++) {
+    Tau[dim] = new float[size];
+    for (int i = 0; i < size; i++)
+      Tau[dim][i] = 0.;
+  }
+
+
+  // the individual terms are added/activated by a non-zero coefficient
+  if (SGScoeffNLu != 0.) 
+    SGS_AddMom_nonlinear_kinetic(Tau);
+
+  if (SGScoeffNLb != 0.) 
+    SGS_AddMom_nonliner_magnetic(Tau);
+
+  if ((SGScoeffEVStarEnS2Star != 0.) || (SGScoeffEnS2StarTrace != 0.))
+    SGS_AddMom_eddy_viscosity_scaled(Tau);
+
+  if (SGScoeffNLuNormedEnS2Star != 0.)
+    SGS_AddMom_nonlinear_kinetic_scaled(Tau);
+  
+  if (SGScoeffSSu != 0.) 
+    SGS_AddMom_scale_similarity_kinetic(Tau);
+  
+  if (SGScoeffSSb != 0.) 
+    SGS_AddMom_scale_similarity_magnetic(Tau);
+
+
+  int n = 0;
+  int igrid, ip1, im1, jp1, jm1, kp1, km1;
+  float MomxIncr,MomyIncr,MomzIncr,EtotIncr;
+
+  float facX = 1. / (2. * CellWidth[0][0]);
+  float facY = 1. / (2. * CellWidth[1][0]);
+  float facZ = 1. / (2. * CellWidth[2][0]);
+
+  for (int k = GridStartIndex[2]; k <= GridEndIndex[2]; k++)
+    for (int j = GridStartIndex[1]; j <= GridEndIndex[1]; j++)
+      for (int i = GridStartIndex[0]; i <= GridEndIndex[0]; i++, n++) {
+
+        igrid = i + (j+k*GridDimension[1])*GridDimension[0];
+        ip1 = i+1 + (j+k*GridDimension[1])*GridDimension[0];
+        im1 = i-1 + (j+k*GridDimension[1])*GridDimension[0];
+        jp1 = i + (j+1+k*GridDimension[1])*GridDimension[0];
+        jm1 = i + (j-1+k*GridDimension[1])*GridDimension[0];
+        kp1 = i + (j+(k+1)*GridDimension[1])*GridDimension[0];
+        km1 = i + (j+(k-1)*GridDimension[1])*GridDimension[0];
+
+
+        MomxIncr = - dtFixed * (
+            (Tau[SGSXX][ip1] - Tau[SGSXX][im1])*facX + 
+            (Tau[SGSXY][jp1] - Tau[SGSXY][jm1])*facY + 
+            (Tau[SGSXZ][kp1] - Tau[SGSXZ][km1])*facZ);
+        EtotIncr = BaryonField[Vel1Num][igrid] * MomxIncr + 0.5 / rho[igrid] * MomxIncr * MomxIncr;
+
+        MomyIncr = - dtFixed * (
+            (Tau[SGSYX][ip1] - Tau[SGSYX][im1])*facX + 
+            (Tau[SGSYY][jp1] - Tau[SGSYY][jm1])*facY + 
+            (Tau[SGSYZ][kp1] - Tau[SGSYZ][km1])*facZ);
+        EtotIncr += BaryonField[Vel2Num][igrid] * MomyIncr + 0.5 / rho[igrid] * MomyIncr * MomyIncr;
+
+        MomzIncr = - dtFixed * (
+            (Tau[SGSZX][ip1] - Tau[SGSZX][im1])*facX + 
+            (Tau[SGSZY][jp1] - Tau[SGSZY][jm1])*facY + 
+            (Tau[SGSZZ][kp1] - Tau[SGSZZ][km1])*facZ);
+        EtotIncr += BaryonField[Vel3Num][igrid] * MomzIncr + 0.5 / rho[igrid] * MomzIncr * MomzIncr;
+
+        BaryonField[Vel1Num][igrid] += MomxIncr / rho[igrid];
+        BaryonField[Vel2Num][igrid] += MomyIncr / rho[igrid];
+        BaryonField[Vel3Num][igrid] += MomzIncr / rho[igrid];
+
+        if (DualEnergyFormalism) {
+          BaryonField[TENum][igrid] = BaryonField[GENum][igrid] + 
+                                      0.5*(BaryonField[Vel1Num][igrid]*BaryonField[Vel1Num][igrid] +
+                                           BaryonField[Vel2Num][igrid]*BaryonField[Vel2Num][igrid] +
+                                           BaryonField[Vel3Num][igrid]*BaryonField[Vel3Num][igrid]);
+        } else {
+          BaryonField[TENum][igrid] += EtotIncr / rho[igrid];
+        }
+      }
+
+  for (int dim = 0; dim < 6; dim++) {
+    delete [] Tau[dim];
+  }
+
+  return SUCCESS;
+}
+
+

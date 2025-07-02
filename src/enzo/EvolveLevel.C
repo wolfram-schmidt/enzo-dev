@@ -574,6 +574,13 @@ int EvolveLevel(TopGridData *MetaData, LevelHierarchyEntry *LevelArray[],
         if( HydroMethod != HD_RK && HydroMethod != MHD_RK ){
             Grids[grid1]->GridData->SolveHydroEquations(LevelCycleCount[level],
                     NumberOfSubgrids[grid1], SubgridFluxesEstimate[grid1], level);
+                if (UseSGSModel) {
+                    if (Grids[grid1]->GridData->SGSUtil_ComputeJacobianDE() == FAIL) {
+                        fprintf(stderr, "grid::EvolveLevel: Error in grid->SGSUtil_ComputeJacobianDE().\n");
+                        return FAIL;
+                    }
+                    Grids[grid1]->GridData->SGS_AddMomentumTermsDE();
+                }      
         }else{
                 if (HydroMethod == HD_RK)
                     Grids[grid1]->GridData->RungeKutta2_1stStep
