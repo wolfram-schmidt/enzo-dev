@@ -215,6 +215,7 @@ typedef long long int   HDF5_hid_t;
 #define ABS(A) abs((int) (A))
 #define ENPY_INT NPY_INT
 #define enpy_int npy_int
+#define EYT_INT YT_INT
 #endif
 
 #ifdef LARGE_INTS
@@ -230,6 +231,7 @@ typedef long long int   HDF5_hid_t;
 #define ABS(A) labs((long_int) (A))
 #define ENPY_INT NPY_LONG
 #define enpy_int npy_long
+#define EYT_INT YT_LONG
 #endif
 
 #ifdef CONFIG_BFLOAT_4
@@ -249,6 +251,9 @@ typedef long long int   HDF5_hid_t;
 #define ENPY_BFLOAT NPY_FLOAT
 #define enpy_bfloat npy_float
 #endif
+#ifdef USE_LIBYT
+#define EYT_BFLOAT YT_FLOAT
+#endif
 #endif
 
 #ifdef CONFIG_BFLOAT_8
@@ -265,6 +270,9 @@ typedef long long int   HDF5_hid_t;
 #ifdef USE_PYTHON
 #define ENPY_BFLOAT NPY_DOUBLE
 #define enpy_bfloat npy_double
+#endif
+#ifdef USE_LIBYT
+#define EYT_BFLOAT YT_DOUBLE
 #endif
 #endif
 
@@ -283,6 +291,9 @@ typedef long long int   HDF5_hid_t;
 #define ENPY_PFLOAT NPY_FLOAT
 #define enpy_pfloat npy_float
 #endif
+#ifdef USE_LIBYT
+#define EYT_PFLOAT YT_FLOAT
+#endif
 #endif
 
 #ifdef CONFIG_PFLOAT_8
@@ -299,6 +310,9 @@ typedef long long int   HDF5_hid_t;
 #ifdef USE_PYTHON
 #define ENPY_PFLOAT NPY_DOUBLE
 #define enpy_pfloat npy_double
+#endif
+#ifdef USE_LIBYT
+#define EYT_PFLOAT YT_DOUBLE
 #endif
 #endif
 
@@ -317,6 +331,9 @@ typedef long long int   HDF5_hid_t;
 #define ENPY_PFLOAT NPY_LONGDOUBLE
 #define enpy_pfloat npy_longdouble
 #endif
+#ifdef USE_LIBYT
+#define EYT_PFLOAT YT_LONGDOUBLE
+#endif
 #endif
 
 /* Definitions for controlling the integer type for particle IDs
@@ -329,6 +346,9 @@ typedef long long int   HDF5_hid_t;
 #define HDF5_FILE_PINT HDF5_FILE_I4
 #define PISYM "d"
 #define ENPY_PINT NPY_INT
+#ifdef USE_LIBYT
+#define EYT_PINT YT_INT
+#endif
 #endif
 
 #ifdef CONFIG_PINT_8
@@ -338,6 +358,9 @@ typedef long long int   HDF5_hid_t;
 #define HDF5_FILE_PINT HDF5_FILE_I8
 #define PISYM "lld"
 #define ENPY_PINT NPY_LONG
+#ifdef USE_LIBYT
+#define EYT_PINT YT_LONGLONG
+#endif
 #endif
 
 /* Standard definitions (well, fairly standard) */
