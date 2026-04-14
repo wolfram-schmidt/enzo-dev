@@ -2617,9 +2617,11 @@ int zEulerSweep(int j, int NumberOfSubgrids, fluxes *SubgridFluxes[],
     int SGSUtil_ComputeMixedFilteredQuantities();
     int SGSUtil_FilterFields();
     int SGSUtil_InternalEnergy();
+    int SGSUtil_MassFraction(int ns);
 
     // the general functions that add the SGS terms to the dynamic eqns.
-     int SGS_AddMomentumTermsDE();
+    int SGS_AddMomentumTermsDE();
+    int SGS_AddDiffusionTermsDE();
     int SGS_AddDiffusionTerms(float **dU);
     int SGS_AddEMFTerms(float **dU);
     int SGS_AddMomentumTerms(float **dU);

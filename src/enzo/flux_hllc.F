@@ -391,6 +391,8 @@ c     &        write (6,*) grslice(i-1,j), grslice(i,j), grslice(i+1,j)
 c
 c     Now check for negative colors (Warning only)
 c
+#define NO_WARNING_IF_NEGATIVE
+#ifdef WARNING_IF_NEGATIVE
       do n=1, ncolor
          do i=i1, i2
             if (colslice(i,j,n) +
@@ -415,7 +417,7 @@ c
             endif
          enddo
       enddo
-      
+#endif      
       enddo                     ! j
 
       end

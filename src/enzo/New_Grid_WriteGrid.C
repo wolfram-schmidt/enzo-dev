@@ -423,17 +423,6 @@ int grid::Group_WriteGrid(FILE *fptr, char *base_name, int grid_id, HDF5_hid_t f
 
       this->write_dataset(GridRank, OutDims, "Velocity_Compression",
           group_id, file_type_id, (VOIDP) buf, TRUE, temp);
-      /*
-	    if (GridRank==3 && SGSEnergies) {
-	      if (this->ComputeNonLinearSGSEnergy(buf) == FAIL) {
-	        fprintf(stderr, "Error in grid->ComputeNonLinearSGSEnergy.\n");
-	        return FAIL;
-	      }
-
-        this->write_dataset(GridRank, OutDims, "SGS_Energy",
-		    group_id, file_type_id, (VOIDP) buf, TRUE, temp);
-	    }
-      */
 
       delete [] buf;
     }
@@ -486,7 +475,7 @@ int grid::Group_WriteGrid(FILE *fptr, char *base_name, int grid_id, HDF5_hid_t f
       }
     }
 
-    if (SGSEnergies) {
+    if (UseSGSModel && SGSEnergies) {
 
       int DensNum, GENum, TENum, Vel1Num, Vel2Num, Vel3Num, B1Num, B2Num, B3Num;
       this->IdentifyPhysicalQuantities(DensNum, GENum, Vel1Num, Vel2Num, Vel3Num,

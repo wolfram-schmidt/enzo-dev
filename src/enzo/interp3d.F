@@ -67,7 +67,8 @@ c
      &        pdim1, pdim2, pdim3
       R_PREC    chi1, chi2, chi3, 
      &        delf0, delf1, delf1new, delf2, delf2new, delf3, delf3new,
-     &        fbar, frac, fx(ijkn), fy(ijkn), fz(ijkn), s, sprime, one
+     &        fbar, frac, fx(ijkn), fy(ijkn), fz(ijkn), s, sprime, one,
+     &        scale_s
       parameter (one=1._RKIND)
 c
       R_PREC    fbar_save(ijkn)
@@ -237,53 +238,53 @@ c
                delf2new = frac*chi2*delf2 + (1._RKIND-chi2)*delf2
                delf3new = frac*chi3*delf3 + (1._RKIND-chi3)*delf3
 c
-c               s = delf0/(delf1new+delf2new+delf3new+sign(1e-30,delf0))
-c               if ((s .lt. 0.9999  .and. s .gt. 1.0e-3) .or. 
-c     &             (s .lt. -1.0e-3 .and. s .gt. -1000.0) )
-c     &             write(6,*) delf0,sprime,chi1,chi2,chi3,
-c     &               delf1,delf2,delf3,fbar,delf1new+delf2new+delf3new,
-c     &               delf1new,delf2new,delf3new,s
                s = delf1new+delf2new+delf3new
-               if (nneg .eq. 0 .and. 
-     &             (fbar+s .le. 0.0 .or. fbar-s .le. 0.0)) then
-                   write(6,*) 'abc',delf0,sprime,chi1,chi2,chi3,
-     &               delf1,delf2,delf3,fbar,delf1new+delf2new+delf3new,
-     &               delf1new,delf2new,delf3new,s,work(i,j,k),
-     &               work(i+1,j+1,k+1),
-     &               work(i+1,j,k), work(i,j+1,k+1), work(i,j+1,k),
-     &               work(i+1,j,k+1), work(i,j,k+1), work(i+1,j+1,k)
-                   write(6,*) i,j,k,pdim1,pdim2,pdim3,dim1,dim2,dim3,
-     &               end1,end2,end3,refine1,refine2,refine3,
-     &               pstart1,pstart2,pstart3
-                   write(6,*) 
-     &                   parent(pstart1+i-1, pstart2+j-1, pstart3+k-1),
-     &                   parent(pstart1+i-1, pstart2+j-1, pstart3+k  ),
-     &                   parent(pstart1+i-1, pstart2+j  , pstart3+k-1),
-     &                   parent(pstart1+i-1, pstart2+j  , pstart3+k  ),
-     &                   parent(pstart1+i  , pstart2+j-1, pstart3+k-1),
-     &                   parent(pstart1+i  , pstart2+j-1, pstart3+k  ),
-     &                   parent(pstart1+i  , pstart2+j  , pstart3+k-1),
-     &                   parent(pstart1+i  , pstart2+j  , pstart3+k  )
-                   write(6,*) 
-     &                   parent(pstart1+i  , pstart2+j  , pstart3+k  ),
-     &                   parent(pstart1+i  , pstart2+j  , pstart3+k+1),
-     &                   parent(pstart1+i  , pstart2+j+1, pstart3+k  ),
-     &                   parent(pstart1+i  , pstart2+j+1, pstart3+k+1),
-     &                   parent(pstart1+i+1, pstart2+j  , pstart3+k  ),
-     &                   parent(pstart1+i+1, pstart2+j  , pstart3+k+1),
-     &                   parent(pstart1+i+1, pstart2+j+1, pstart3+k  ),
-     &                   parent(pstart1+i+1, pstart2+j+1, pstart3+k+1)
-                   ierror = 1
-                   return
-                endif
-                if (s .ne. s) then
-                   write(6,*) 'int2',delf0,sprime,chi1,chi2,chi3,
-     &               delf1,delf2,delf3,fbar,delf1new+delf2new+delf3new,
-     &               delf1new,delf2new,delf3new,s,work(i,j,k),
-     &               work(i+1,j+1,k+1)
-                   ierror = 1
-                   return
-                endif
+c
+c              --- NaN guard: catch arithmetic breakdown early ---
+c              If s is NaN (from division issues in frac or elsewhere),
+c              fall back immediately to flat interpolation for this cell.
+c              This prevents NaN propagation into the grid.
+c
+               if (s .ne. s) then
+c                 s is NaN - zero all slopes (nearest-neighbour fallback)
+                  delf1new = 0.0_RKIND
+                  delf2new = 0.0_RKIND
+                  delf3new = 0.0_RKIND
+                  s        = 0.0_RKIND
+               endif
+c
+c              --- Positivity guard: prevent interpolation to negative values ---
+c              When nneg==0 (all parent values positive) but the slope
+c              magnitude would push interpolated values to zero or below,
+c              apply a two-level fallback:
+c
+c              Level 1 - slope scaling (preferred):
+c                Scale all delf#new down so fbar - |s| stays positive.
+c
+c              Level 2 - flat / nearest-neighbour (last resort):
+c                If fbar itself is <= 0, zero all slopes.
+c
+               if (nneg .eq. 0 .and.
+     &             (fbar+s .le. 0.0_RKIND .or. fbar-s .le. 0.0_RKIND))
+     &             then
+                  if (fbar .gt. 0.0_RKIND .and.
+     &                abs(s) .gt. 0.0_RKIND) then
+c                    Scale slopes so that fbar - |s_new| >= epsilon > 0
+                     scale_s = fbar*(1.0_RKIND - 1.0e-14_RKIND) / abs(s)
+                     scale_s = min(scale_s, 1.0_RKIND)
+                     delf1new = delf1new * scale_s
+                     delf2new = delf2new * scale_s
+                     delf3new = delf3new * scale_s
+                     s        = s        * scale_s
+                  else
+c                    fbar <= 0: fall back to flat (nearest-neighbour)
+                     delf1new = 0.0_RKIND
+                     delf2new = 0.0_RKIND
+                     delf3new = 0.0_RKIND
+                     s        = 0.0_RKIND
+                  endif
+               endif
+c              --- END MODIFIED SECTION ---
 c
 c              Now, find the the interpolation coefficients.
 c

@@ -4,13 +4,18 @@ syntax: glob
 *.o
 *.f
 *.f90
+*-mod.C
+*-mod.F
+*-bak.C
+*-bak.F
 *~
 *.pyc
 *.bin
 *.ipch
 .vscode
+.ipynb_checkpoints
 
-bin/enzo
+bin/enzo*
 bin/inits
 TAGS
 DEPEND

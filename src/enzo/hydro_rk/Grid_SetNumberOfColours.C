@@ -47,10 +47,9 @@ int grid::SetNumberOfColours(void)
     return FAIL;
   }
   
-  /*
-  fprintf(stdout, "grid:SetNumberOfColours: %"ISYM" %"ISYM" %"ISYM" %"ISYM" %"ISYM" \n", 
-  	  SNColourNum, MetalNum, MBHColourNum, Galaxy1ColourNum, Galaxy2ColourNum); 
-  */
+  if (debug)
+    fprintf(stdout, "grid:SetNumberOfColours: %"ISYM" %"ISYM" %"ISYM" %"ISYM" %"ISYM" \n", 
+  	    SNColourNum, MetalNum, MBHColourNum, Galaxy1ColourNum, Galaxy2ColourNum); 
 
   if (MetalNum != -1) {
     _nc++;
@@ -74,15 +73,14 @@ int grid::SetNumberOfColours(void)
 
   NColor = 0;  
   NSpecies += _nc;
-
-  
+ 
   if (NSpecies != 0 && MultiSpecies == 0)
     NoMultiSpeciesButColors = 1;
 
-  if (debug) 
-    fprintf(stdout, "grid:SetNumberOfColours: NEQ_HYDRO = %"ISYM", NSpecies = %"ISYM", NColor = %"ISYM"\n", 
-  	  NEQ_HYDRO, NSpecies, NColor); 
 
+  if (debug1) 
+    fprintf(stdout, "grid:SetNumberOfColours: NEQ_HYDRO = %"ISYM", NSpecies = %"ISYM", NColor = %"ISYM", NoMultiSpeciesButColors = %"ISYM"\n", 
+  	  NEQ_HYDRO, NSpecies, NColor, NoMultiSpeciesButColors); 
 
   return SUCCESS;
 

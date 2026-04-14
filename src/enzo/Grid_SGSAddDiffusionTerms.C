@@ -33,6 +33,12 @@
 
 using namespace std;
 
+/********************* PROTOTYPES *********************/
+
+int GetUnits(float *DensityUnits, float *LengthUnits,
+             float *TemperatureUnits, float *TimeUnits,
+             float *VelocityUnits, float Time);
+
 /* 
  * This function adds to the SGS diffusive flux of internal energy
  * the pure (unscaled) nonlinear model
@@ -91,17 +97,16 @@ void grid::SGS_AddDiff_nonlinear_energy(float **Flux) {
           Flux[SGSZ][igrid] += CDeltaSqr * rho[igrid] * JacVel[SGSZ][l][igrid] * GradEint[l][igrid];
         }
       }
-
 }
 
 /* 
- * This function adds to the SGS diffusive flux of internal energy
+ * This function adds to the SGS diffusive flux of the fractional density of a species
  * the pure (unscaled) nonlinear model
  * FZ = 1/12 * Delta^2 rho u_i,k (grad Z)_k
  */
 void grid::SGS_AddDiff_nonlinear_species(float **Flux, int s) {
-  if (debug1)
-    printf("[%"ISYM"] grid::SGS_AddDiff_nonlinear_species start\n",MyProcessorNumber);
+  if (debug)
+    printf("[%"ISYM"] grid::SGS_AddDiff_nonlinear_species %"ISYM" start\n",MyProcessorNumber,s);
 
   int DensNum, GENum, TENum, Vel1Num, Vel2Num, Vel3Num;
   int B1Num, B2Num, B3Num, PhiNum;
@@ -190,7 +195,7 @@ int grid::SGS_AddDiffusionTerms(float **dU) {
   }
 
   int size = 1;
-  float *Flux[6];
+  float *Flux[MAX_DIMENSION];
 
   for (int dim = 0; dim < MAX_DIMENSION; dim++) {
     size *= GridDimension[dim];
@@ -233,19 +238,18 @@ int grid::SGS_AddDiffusionTerms(float **dU) {
 
         dU[iEtot][n] += incr;
 
-	if (DualEnergyFormalism)
-	  dU[iEint][n] += incr;
+	      if (DualEnergyFormalism)
+	        dU[iEint][n] += incr;
       }
 
-  // change species from density to mass fraction
   for (int ns = NEQ_HYDRO; ns < NEQ_HYDRO+NSpecies; ns++) {
     if (debug)
-      printf("Adding fluxes to species %"ISYM", %"ISYM", %"ISYM"\n",ns,ns-NEQ_HYDRO,iEtot);
+      printf("Adding fluxes to species %"ISYM", %"ISYM"\n",ns,ns-NEQ_HYDRO);
 
     // reset fluxes to zero
     for (int dim = 0; dim < MAX_DIMENSION; dim++)
       for (int i = 0; i < size; i++)
-	Flux[dim][i] = 0.;
+	      Flux[dim][i] = 0.;
 
     // compute flux for species
     if (SGScoeffNLm != 0.) 
@@ -255,30 +259,181 @@ int grid::SGS_AddDiffusionTerms(float **dU) {
 
     for (int k = GridStartIndex[2]; k <= GridEndIndex[2]; k++) 
       for (int j = GridStartIndex[1]; j <= GridEndIndex[1]; j++)
-	for (int i = GridStartIndex[0]; i <= GridEndIndex[0]; i++, n++) {
+	      for (int i = GridStartIndex[0]; i <= GridEndIndex[0]; i++, n++) {
 
-	  igrid = i + (j+k*GridDimension[1])*GridDimension[0];
-	  ip1 = i+1 + (j+k*GridDimension[1])*GridDimension[0];
-	  im1 = i-1 + (j+k*GridDimension[1])*GridDimension[0];
-	  jp1 = i + (j+1+k*GridDimension[1])*GridDimension[0];
-	  jm1 = i + (j-1+k*GridDimension[1])*GridDimension[0];
-	  kp1 = i + (j+(k+1)*GridDimension[1])*GridDimension[0];
-	  km1 = i + (j+(k-1)*GridDimension[1])*GridDimension[0];
+	        igrid = i + (j+k*GridDimension[1])*GridDimension[0];
+	        ip1 = i+1 + (j+k*GridDimension[1])*GridDimension[0];
+	        im1 = i-1 + (j+k*GridDimension[1])*GridDimension[0];
+	        jp1 = i + (j+1+k*GridDimension[1])*GridDimension[0];
+	        jm1 = i + (j-1+k*GridDimension[1])*GridDimension[0];
+	        kp1 = i + (j+(k+1)*GridDimension[1])*GridDimension[0];
+	        km1 = i + (j+(k-1)*GridDimension[1])*GridDimension[0];
 
-	  incr = - dtFixed * (
+	        incr = - dtFixed * (
             (Flux[SGSX][ip1] - Flux[SGSX][im1])*facX + 
             (Flux[SGSY][jp1] - Flux[SGSY][jm1])*facY + 
             (Flux[SGSZ][kp1] - Flux[SGSZ][km1])*facZ);
 
           // ensure that metallicity remains above floor
-	  dU[ns][n] += ((BaryonField[ns][igrid] + dU[ns][n] + incr >= 1e-12) ? incr : (1e-12 - BaryonField[ns][igrid] - dU[ns][n]));
-	  /*
-	  if (debug1 && (i == GridStartIndex[0]) && (j == GridStartIndex[1]))
-	    cout << "[" << MyProcessorNumber << "] "<< k << ", " << ns << " post mass fraction = " 
-		 << BaryonField[ns][igrid] << " " << dU[ns][n] - incr << " " << incr << " " << BaryonField[ns][igrid] + dU[ns][n] << endl;
-	  */
-	}
+	        dU[ns][n] += ((BaryonField[ns][igrid] + dU[ns][n] + incr >= 1e-12) ? incr : (1e-12 - BaryonField[ns][igrid] - dU[ns][n]));
+	        /*
+	        if (debug1 && (i == GridStartIndex[0]) && (j == GridStartIndex[1]))
+	          cout << "[" << MyProcessorNumber << "] "<< k << ", " << ns << " post mass fraction = " 
+		             << BaryonField[ns][igrid] << " " << dU[ns][n] - incr << " " << incr << " " << BaryonField[ns][igrid] + dU[ns][n] << endl;
+	         */
+	      }
 
+  }
+
+  for (int dim = 0; dim < MAX_DIMENSION; dim++) {
+    delete [] Flux[dim];
+  }
+
+  return SUCCESS;
+}
+
+/*
+ * This function initializes a zero flux vector and calls the individual
+ * functions that add the different terms to it.
+ * Finally, the divergence of the flux is added directly to the
+ * bayron fields (direct-Euler PPM). 
+ */
+int grid::SGS_AddDiffusionTermsDE() {
+  if (ProcessorNumber != MyProcessorNumber) {
+    return SUCCESS;
+  }
+
+  if (Time == 0.)
+    return SUCCESS;
+
+  if (debug)
+    printf("[%"ISYM"] grid::SGS_AddDiffusionTermsDE start\n",MyProcessorNumber);
+
+  int DensNum, GENum, TENum, Vel1Num, Vel2Num, Vel3Num;
+  this->IdentifyPhysicalQuantities(DensNum, GENum, Vel1Num, Vel2Num, Vel3Num, TENum);
+ 
+  float DensityUnits, LengthUnits, TemperatureUnits, TimeUnits, VelocityUnits;
+
+  GetUnits(&DensityUnits, &LengthUnits, &TemperatureUnits, &TimeUnits, &VelocityUnits, Time);
+
+  float* rho;
+
+  rho = BaryonField[DensNum];
+
+  int size = 1;
+  float *Flux[MAX_DIMENSION];
+
+  for (int dim = 0; dim < MAX_DIMENSION; dim++) {
+    size *= GridDimension[dim];
+  }
+
+  for (int dim = 0; dim < MAX_DIMENSION; dim++) {
+    Flux[dim] = new float[size];
+    for (int i = 0; i < size; i++)
+      Flux[dim][i] = 0.;
+  }
+
+  // the individual terms are added/activated by a non-zero coefficient
+  if (SGScoeffNLe != 0.)
+    SGS_AddDiff_nonlinear_energy(Flux);
+
+  int n = 0;
+  int igrid, ip1, im1, jp1, jm1, kp1, km1;
+  float incr;
+  float ge_min = 1.0/TemperatureUnits / ((Gamma-1.0)*Mu); // 1 K floor
+
+  float facX = 1. / (2. * CellWidth[0][0]);
+  float facY = 1. / (2. * CellWidth[1][0]);
+  float facZ = 1. / (2. * CellWidth[2][0]);
+
+  for (int k = GridStartIndex[2]; k <= GridEndIndex[2]; k++)
+    for (int j = GridStartIndex[1]; j <= GridEndIndex[1]; j++)
+      for (int i = GridStartIndex[0]; i <= GridEndIndex[0]; i++, n++) {
+
+        igrid = i + (j+k*GridDimension[1])*GridDimension[0];
+        ip1 = i+1 + (j+k*GridDimension[1])*GridDimension[0];
+        im1 = i-1 + (j+k*GridDimension[1])*GridDimension[0];
+        jp1 = i + (j+1+k*GridDimension[1])*GridDimension[0];
+        jm1 = i + (j-1+k*GridDimension[1])*GridDimension[0];
+        kp1 = i + (j+(k+1)*GridDimension[1])*GridDimension[0];
+        km1 = i + (j+(k-1)*GridDimension[1])*GridDimension[0];
+
+        incr = - dtFixed * (
+            (Flux[SGSX][ip1] - Flux[SGSX][im1])*facX + 
+            (Flux[SGSY][jp1] - Flux[SGSY][jm1])*facY + 
+            (Flux[SGSZ][kp1] - Flux[SGSZ][km1])*facZ);
+
+        if (BaryonField[GENum][igrid] + incr / rho[igrid] < ge_min)
+          incr = (ge_min - BaryonField[GENum][igrid]) * rho[igrid];
+
+        BaryonField[TENum][igrid] += incr / rho[igrid];
+
+	      if (DualEnergyFormalism)
+	        BaryonField[GENum][igrid] += incr / rho[igrid];
+      }
+
+  // reset auxiliary field
+  for (int i = 0; i < size; i++)
+	  AuxField[i] = 0.;
+
+  int DeNum = FindField(ElectronDensity, FieldType, NumberOfBaryonFields);
+  int MetalNum = FindField(Metallicity, FieldType, NumberOfBaryonFields);
+  
+  int ns_max = NEQ_HYDRO + NSpecies;
+  if (MetalNum >= 0)
+    ns_max++;
+
+	for (int ns = NEQ_HYDRO, s = 0; ns < ns_max; ns++, s++) {
+      
+    if (ns == DeNum)
+      continue;
+    
+    if (debug)
+      printf("Adding fluxes to species %"ISYM", %"ISYM"\n",ns,s);
+
+    // reset fluxes to zero
+    for (int dim = 0; dim < MAX_DIMENSION; dim++)
+      for (int i = 0; i < size; i++)
+	      Flux[dim][i] = 0.;
+
+    // compute flux for species
+    if (SGScoeffNLm != 0.) 
+      SGS_AddDiff_nonlinear_species(Flux, s);
+
+    n = 0;
+
+    for (int k = GridStartIndex[2]; k <= GridEndIndex[2]; k++) 
+      for (int j = GridStartIndex[1]; j <= GridEndIndex[1]; j++)
+	      for (int i = GridStartIndex[0]; i <= GridEndIndex[0]; i++, n++) {
+
+	        igrid = i + (j+k*GridDimension[1])*GridDimension[0];
+	        ip1 = i+1 + (j+k*GridDimension[1])*GridDimension[0];
+	        im1 = i-1 + (j+k*GridDimension[1])*GridDimension[0];
+	        jp1 = i + (j+1+k*GridDimension[1])*GridDimension[0];
+	        jm1 = i + (j-1+k*GridDimension[1])*GridDimension[0];
+	        kp1 = i + (j+(k+1)*GridDimension[1])*GridDimension[0];
+	        km1 = i + (j+(k-1)*GridDimension[1])*GridDimension[0];
+
+	        incr = - dtFixed * (
+            (Flux[SGSX][ip1] - Flux[SGSX][im1])*facX + 
+            (Flux[SGSY][jp1] - Flux[SGSY][jm1])*facY + 
+            (Flux[SGSZ][kp1] - Flux[SGSZ][km1])*facZ);
+
+          // ensure that fraction remains above floor
+          incr = max(incr, 1e-20*rho[igrid] - BaryonField[ns][igrid]);
+          BaryonField[ns][igrid] += incr;
+
+          /*
+          // use auxiliary field to sum up fractions
+          if (debug && NoMultiSpeciesButColors != 1) {
+            AuxField[igrid] += BaryonField[ns][igrid] / BaryonField[DensNum][igrid];
+
+            if ((i == GridStartIndex[0]) && (j == GridStartIndex[1]))
+              cout << "[" << MyProcessorNumber << "] "<< k << ", " << ns << " fractional dens diff = "
+                   << incr << " " << BaryonField[ns][igrid] << ", tot frac = " << AuxField[igrid] << endl;
+          }
+          */
+        }
   }
 
   for (int dim = 0; dim < MAX_DIMENSION; dim++) {

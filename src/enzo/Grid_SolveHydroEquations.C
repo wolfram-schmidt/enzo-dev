@@ -193,6 +193,9 @@ int grid::SolveHydroEquations(int CycleNumber, int NumberOfSubgrids,
     if (Galaxy1ColourNum != -1) colnum[NumberOfColours++] = Galaxy1ColourNum;
     if (Galaxy2ColourNum != -1) colnum[NumberOfColours++] = Galaxy2ColourNum;
 
+    if (debug)
+      fprintf(stdout, "grid:SolveHydroEquations: %"ISYM" fields, %"ISYM" colors, %"ISYM" \n", 
+  	    NumberOfBaryonFields, NumberOfColours, MetalNum); 
 
     /* Add Simon Glover's chemistry species as color fields */
 

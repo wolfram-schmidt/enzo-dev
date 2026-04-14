@@ -72,10 +72,7 @@ int grid::SGSUtil_FilterFields() {
     if (UseMHD)
       NumFilteredFields = 7;
     else
-      if (UseSGSDiffusion) 
-	NumFilteredFields = 5;
-      else
-	NumFilteredFields = 4;
+      NumFilteredFields = 4;
 
     for (int m = 0; m < NumFilteredFields; m++)
         if (FilteredFields[m] == NULL) {
@@ -119,10 +116,7 @@ int grid::SGSUtil_FilterFields() {
                   FilteredFields[4][igrid] += totalWeight * BaryonField[B1Num][ifilter];
                   FilteredFields[5][igrid] += totalWeight * BaryonField[B2Num][ifilter];
                   FilteredFields[6][igrid] += totalWeight * BaryonField[B3Num][ifilter];
-                } else {
-		  if (UseSGSDiffusion) 
-		    FilteredFields[4][igrid] += totalWeight * BaryonField[DensNum][ifilter]*BaryonField[GENum][ifilter];
-		}
+                } 
               }
             }
           } // end of innter triple for
@@ -131,9 +125,6 @@ int grid::SGSUtil_FilterFields() {
           FilteredFields[1][igrid] /= FilteredFields[0][igrid];
           FilteredFields[2][igrid] /= FilteredFields[0][igrid];
           FilteredFields[3][igrid] /= FilteredFields[0][igrid];
-	  if (UseSGSDiffusion) {
-	    FilteredFields[4][igrid] /= FilteredFields[0][igrid];
-	  }
         }
       }
     } // end of outer triple for
@@ -153,13 +144,11 @@ int grid::SGSUtil_InternalEnergy() {
     if (DualEnergyFormalism)
         return SUCCESS;
 
-    if (debug1)
+    if (debug)
       printf("[%"ISYM"] grid::SGSUtil_InternalEnergy start\n",MyProcessorNumber);
 
-    int DensNum, GENum, TENum, Vel1Num, Vel2Num, Vel3Num, 
-        B1Num, B2Num, B3Num, PhiNum;
-    this->IdentifyPhysicalQuantities(DensNum, GENum, Vel1Num, Vel2Num, Vel3Num, 
-            TENum, B1Num, B2Num, B3Num, PhiNum);
+    int DensNum, GENum, TENum, Vel1Num, Vel2Num, Vel3Num;
+    this->IdentifyPhysicalQuantities(DensNum, GENum, Vel1Num, Vel2Num, Vel3Num, TENum);
 
     int size = 1;
     int StartIndex[MAX_DIMENSION];
@@ -176,8 +165,8 @@ int grid::SGSUtil_InternalEnergy() {
 
     if (AuxField == NULL) {
         AuxField = new float[size];
-	for (int i = 0; i < size; i++)
-	  AuxField[i] = 0.;
+	      for (int i = 0; i < size; i++)
+	        AuxField[i] = 0.;
     }
 
     int igrid;
@@ -189,10 +178,69 @@ int grid::SGSUtil_InternalEnergy() {
         
           igrid = i + (j+k*GridDimension[1])*GridDimension[0];
 
-	  v2 = BaryonField[Vel1Num][igrid]*BaryonField[Vel1Num][igrid] + 
-	       BaryonField[Vel2Num][igrid]*BaryonField[Vel2Num][igrid] + 
- 	       BaryonField[Vel3Num][igrid]*BaryonField[Vel3Num][igrid];
-	  AuxField[igrid] = BaryonField[TENum][igrid] - 0.5*v2;
+	        v2 = BaryonField[Vel1Num][igrid]*BaryonField[Vel1Num][igrid] + 
+	             BaryonField[Vel2Num][igrid]*BaryonField[Vel2Num][igrid] + 
+ 	             BaryonField[Vel3Num][igrid]*BaryonField[Vel3Num][igrid];
+	        AuxField[igrid] = BaryonField[TENum][igrid] - 0.5*v2;
+        }
+      }
+    }
+
+    return SUCCESS;
+}
+
+/*
+ * This function computes the fraction of a species.
+ * Field values are stored in AuxField. Is needed for SGS diffusion.
+ */
+int grid::SGSUtil_MassFraction(int ns) {
+    if (ProcessorNumber != MyProcessorNumber) {
+        return SUCCESS;
+    }
+
+    if (ns < NEQ_HYDRO)
+        return SUCCESS;
+
+    if (debug)
+        printf("[%"ISYM"] grid::SGSUtil_MassFraction start, species %"ISYM"\n",MyProcessorNumber,ns);
+
+    int DensNum, GENum, TENum, Vel1Num, Vel2Num, Vel3Num;
+    this->IdentifyPhysicalQuantities(DensNum, GENum, Vel1Num, Vel2Num, Vel3Num, TENum);
+
+    int size = 1;
+    int StartIndex[MAX_DIMENSION];
+    int EndIndex[MAX_DIMENSION];
+
+    for (int dim = 0; dim < MAX_DIMENSION; dim++) {
+        size *= GridDimension[dim];
+
+        /* we need the filtered fields in the second ghost zone as well
+         * as we need derivatives in first ghost zone */
+        StartIndex[dim] = GridStartIndex[dim] - 2;
+        EndIndex[dim] = GridEndIndex[dim] + 2;
+    }
+
+    if (AuxField == NULL) {
+        AuxField = new float[size];
+	      for (int i = 0; i < size; i++)
+	        AuxField[i] = 0.;
+    }
+
+    int igrid;
+
+    for (int k = StartIndex[2]; k <= EndIndex[2]; k++) {
+      for (int j = StartIndex[1]; j <= EndIndex[1]; j++) {
+        for (int i = StartIndex[0]; i <= EndIndex[0]; i++) {
+        
+          igrid = i + (j+k*GridDimension[1])*GridDimension[0];
+
+	        AuxField[igrid] = BaryonField[ns][igrid] / BaryonField[DensNum][igrid];
+          /*
+          if (debug && (i == GridStartIndex[0]) && (j == GridStartIndex[1]))
+              cout << "[" << MyProcessorNumber << "] "<< k << ", " << ns << " aux field = "
+                   << BaryonField[ns][igrid] << " " << BaryonField[DensNum][igrid] << " " << AuxField[igrid] << endl;
+          */
+          
         }
       }
     }
@@ -209,7 +257,7 @@ int grid::SGSUtil_ComputeGradient(float *Grad[MAX_DIMENSION],float *field) {
         return SUCCESS;
     }
 
-    if (debug1)
+    if (debug)
       printf("[%"ISYM"] grid::SGSUtil_ComputeGradient start\n",MyProcessorNumber);
 
     int size = 1;
@@ -227,9 +275,9 @@ int grid::SGSUtil_ComputeGradient(float *Grad[MAX_DIMENSION],float *field) {
 
     for (int n = 0; n < MAX_DIMENSION; n++)
       if (Grad[n] == NULL) {
-	Grad[n] = new float[size];
-	for (int i = 0; i < size; i++)
-	  Grad[n][i] = 0.;
+	      Grad[n] = new float[size];
+	      for (int i = 0; i < size; i++)
+	        Grad[n][i] = 0.;
       }
 
     int igrid, ip1, im1, jp1, jm1, kp1, km1;
@@ -348,7 +396,7 @@ int grid::SGSUtil_ComputeJacobianNormSqr(float *JacNormSqr, float *Jac[][MAX_DIM
     }
 
     if (debug1)
-      printf("[%"ISYM"] grid::SGSUtil_ComputeJacobian start\n",MyProcessorNumber);
+      printf("[%"ISYM"] grid::SGSUtil_ComputeJacobianNormSqr start\n",MyProcessorNumber);
 
     int size = 1;
 
@@ -499,9 +547,7 @@ int grid::SGSUtil_ComputeJacobianDE() {
       printf("[%"ISYM"] grid::SGSUtil_ComputeJacobianDE start\n",MyProcessorNumber);
 
     int DensNum, GENum, TENum, Vel1Num, Vel2Num, Vel3Num;
-        // B1Num, B2Num, B3Num, PhiNum;
     this->IdentifyPhysicalQuantities(DensNum, GENum, Vel1Num, Vel2Num, Vel3Num, TENum); 
-            // B1Num, B2Num, B3Num, PhiNum);
 
     int size = 1;
     int StartIndex[MAX_DIMENSION];

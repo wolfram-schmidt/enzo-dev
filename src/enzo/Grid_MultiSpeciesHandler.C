@@ -25,7 +25,7 @@
  
 int grid::MultiSpeciesHandler()
 {
-  if ((!MultiSpecies) && (!RadiativeCooling)) return SUCCESS; 
+  if ((!MultiSpecies) && (!RadiativeCooling) && (!UseSGSDiffusion)) return SUCCESS; 
   if (GadgetEquilibriumCooling != 0) return SUCCESS;
 
   LCAPERF_START("grid_MultiSpeciesHandler");
@@ -36,10 +36,8 @@ int grid::MultiSpeciesHandler()
     if (this->GrackleWrapper() == FAIL) {
       ENZO_FAIL("Error in GrackleWrapper.\n");
     }
-    return SUCCESS;
   }
-#endif
-
+#else
   if (MultiSpecies && RadiativeCooling ) {
     int RTCoupledSolverIntermediateStep = FALSE;
     this->SolveRateAndCoolEquations(RTCoupledSolverIntermediateStep);
@@ -48,6 +46,76 @@ int grid::MultiSpeciesHandler()
       this->SolveRateEquations();
     if (RadiativeCooling)
       this->SolveRadiativeCooling();
+  }
+#endif
+
+  if (HydroMethod != HD_RK && HydroMethod != MHD_RK && UseSGSModel && UseSGSDiffusion) {
+
+    int DensNum, GENum, TENum, Vel1Num, Vel2Num, Vel3Num;
+    this->IdentifyPhysicalQuantities(DensNum, GENum, Vel1Num, Vel2Num, Vel3Num, TENum);
+
+    // internal energy gradient
+    if (DualEnergyFormalism) {
+	    if (this->SGSUtil_ComputeGradient(GradEint,BaryonField[GENum]) == FAIL) {
+	      fprintf(stderr, "grid::MultiSpeciesHandler: Error in SGSUtil_ComputeGradient(Eint)).\n");
+	      return FAIL;
+	    }
+	  } else {
+      // compute internal energy and store in AuxField
+      if (this->SGSUtil_InternalEnergy() == FAIL) {
+        fprintf(stderr, "grid::MultiSpeciesHandler: Error in SGSUtil_InternalEnergy.\n");
+	      return FAIL;
+      }
+	    if (this->SGSUtil_ComputeGradient(GradEint,AuxField) == FAIL) {
+	      fprintf(stderr, "grid::MultiSpeciesHandler: Error in SGSUtil_ComputeGradient(Eint)).\n");
+	      return FAIL;
+	    }
+	  }
+
+    int DeNum = FindField(ElectronDensity, FieldType, NumberOfBaryonFields);    
+    if (debug1 && DeNum >= 0)
+      printf("Free electron field: %"ISYM"\n",DeNum);
+
+    int HINum = FindField(HIDensity, FieldType, NumberOfBaryonFields);
+    if (debug1 && HINum >= 0)
+      printf("HI field: %"ISYM"\n",HINum);
+
+    int MetalNum = FindField(Metallicity, FieldType, NumberOfBaryonFields);
+    if (debug1 && MetalNum >= 0)
+      printf("Metal field: %"ISYM"\n",MetalNum);
+
+    int ns_max = NEQ_HYDRO + NSpecies;
+    if (MetalNum >= 0)
+      ns_max++;
+
+    if (debug1)
+      printf("Number of baryon fields: %"ISYM", %"ISYM" hydro, %"ISYM" species, %"ISYM" all\n",
+             NumberOfBaryonFields,NEQ_HYDRO,NSpecies,ns_max);
+
+    // species gradients (excluding free electron field and colors)
+	  for (int ns = NEQ_HYDRO, s = 0; ns < ns_max; ns++, s++) {
+
+        if (ns == DeNum)
+          continue;
+
+        if (debug1)
+          printf("Computing gradient of species %"ISYM", %"ISYM"\n",ns,s);
+
+        // change species from density to mass fraction and store in AuxField
+        if (this->SGSUtil_MassFraction(ns) == FAIL) {
+          fprintf(stderr, "grid::MassFraction: Error in SGSUtil_MassFraction.\n");
+	        return FAIL;
+        } 
+	      if (this->SGSUtil_ComputeGradient(GradSpec[s],AuxField) == FAIL) {
+	        fprintf(stderr, "grid::MultiSpeciesHandler: Error in SGSUtil_ComputeGradient(Spec)).\n");
+	        return FAIL;
+	      }
+    }
+
+    if (this->SGS_AddDiffusionTermsDE() == FAIL) {
+	    fprintf(stderr, "grid::MultiSpeciesHandler: Error in SGS_AddDiffusionTermsDE.\n");
+	    return FAIL;
+    }
   }
 
   if (ProblemType == 62)

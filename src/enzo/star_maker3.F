@@ -137,7 +137,7 @@ c              2) is density greater than threshold?
 c
                if (d(i,j,k) .lt. odthresh) goto 10
 c
-#define CONSTANT_EFFICIENCY
+#define NO_CONSTANT_EFFICIENCY
 c
 #ifdef CONSTANT_EFFICIENCY
 c
@@ -550,12 +550,13 @@ c
                         if (imetal .eq. 1) then
 c
 c           "Cen method".  This takes into account gas recycling.
+c           Clip metallicity at 10 Zsun
 c
-                           metal(ic,jc,kc) = 
+                           metal(ic,jc,kc) = min(0.1295_RKIND,
      &                          (metal(ic,jc,kc)*d(ic,jc,kc) + 
      &                          (mform / distcells) * 
      &                          (yield * (1._RKIND-metalf(n)) + 
-     &                          m_eject * metalf(n))) * dratio
+     &                          m_eject * metalf(n))) * dratio)
             !metal is a fraction
 c
                            if (imulti_metals .eq. 1) then
@@ -579,7 +580,7 @@ c
                         w(ic,jc,kc) = w(ic,jc,kc)/d(ic,jc,kc)
 c
 c           If te is really total energy (and it is unless imethod=2),
-c             then just set this value
+c           then just set this value
 c
                         if (imethod .ne. 2 .and. idual .eq. 1) then
                            te(ic,jc,kc) = 0.5_RKIND*(u(ic,jc,kc)**2 + 
